@@ -55,13 +55,17 @@ class ChatConsumer(AsyncWebsocketConsumer):
 
     async def chat_message(self, event):
         # Called for every message broadcast to the group; sends it to this socket.
-        await self.send(text_data=json.dumps({
-            "message_id": event["message_id"],
-            "content": event["content"],
-            "sender_id": event["sender_id"],
-            "sender_username": event["sender_username"],
-            "created_at": event["created_at"],
-        }))
+        await self.send(
+            text_data=json.dumps(
+                {
+                    "message_id": event["message_id"],
+                    "content": event["content"],
+                    "sender_id": event["sender_id"],
+                    "sender_username": event["sender_username"],
+                    "created_at": event["created_at"],
+                }
+            )
+        )
 
     @database_sync_to_async
     def is_conversation_participant(self):

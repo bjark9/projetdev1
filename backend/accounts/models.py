@@ -6,6 +6,7 @@ class User(AbstractUser):
     """
     Custom user model, extending Django's built-in auth User.
     """
+
     # avatar = models.ImageField(upload_to="avatars/", blank=True, null=True)
     is_online = models.BooleanField(default=False)
     last_seen = models.DateTimeField(blank=True, null=True)

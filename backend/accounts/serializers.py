@@ -1,4 +1,4 @@
-#Transform database objects into a string or byte stream, such as JSON, to send data to a browser or API.
+# Transform database objects into a string or byte stream, such as JSON, to send data to a browser or API.
 from rest_framework import serializers
 
 from .models import User

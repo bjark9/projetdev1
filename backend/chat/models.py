@@ -8,6 +8,7 @@ class Conversation(models.Model):
     A conversation between two or more users.
     Works for both 1-on-1 DMs and group chats.
     """
+
     participants = models.ManyToManyField(
         settings.AUTH_USER_MODEL,
         related_name="conversations",
@@ -31,6 +32,7 @@ class Message(models.Model):
     """
     A single message sent within a conversation.
     """
+
     conversation = models.ForeignKey(
         Conversation,
         on_delete=models.CASCADE,
