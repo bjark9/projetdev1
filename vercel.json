@@ -8,7 +8,7 @@
     },
     "backend": {
       "root": "backend/",
-      "entrypoint": "mysite.asgi:application"
+      "entrypoint": "backend.mysite.asgi:application"
     }
   },
   "rewrites": [

@@ -6,13 +6,15 @@ import sys
 
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-if BASE_DIR not in sys.path:
-    sys.path.insert(0, BASE_DIR)
+PROJECT_ROOT = os.path.dirname(BASE_DIR)
+for path in (BASE_DIR, PROJECT_ROOT):
+    if path not in sys.path:
+        sys.path.insert(0, path)
 
 
 def main():
     """Run administrative tasks."""
-    os.environ.setdefault("DJANGO_SETTINGS_MODULE", "mysite.settings")
+    os.environ.setdefault("DJANGO_SETTINGS_MODULE", "backend.mysite.settings")
     try:
         from django.core.management import execute_from_command_line
     except ImportError as exc:
