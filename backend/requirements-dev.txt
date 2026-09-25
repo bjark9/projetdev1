@@ -3,3 +3,4 @@ ruff==0.13.0
 mypy==1.18.2
 django-stubs==5.2.7
 types-channels
+djangorestframework-stubs
