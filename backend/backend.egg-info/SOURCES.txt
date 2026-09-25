@@ -26,7 +26,6 @@ chat/migrations/0001_initial.py
 chat/migrations/__init__.py
 mysite/__init__.py
 mysite/asgi.py
-mysite/settings-example.py
 mysite/settings.py
 mysite/urls.py
 mysite/wsgi.py
