@@ -10,4 +10,4 @@ plugins = ["mypy_django_plugin.main"]
 check_untyped_defs = true
 
 [tool.django-stubs]
-django_settings_module = "mysite.settings-example"
+django_settings_module = "mysite.settings"

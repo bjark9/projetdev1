@@ -23,6 +23,8 @@ import chat.routing  # noqa: E402  (must come after django_asgi_app is set up)
 application = ProtocolTypeRouter(
     {
         "http": django_asgi_app,
-        "websocket": AuthMiddlewareStack(URLRouter(chat.routing.websocket_urlpatterns)),
+        "websocket": AuthMiddlewareStack(  # type: ignore[arg-type]
+            URLRouter(chat.routing.websocket_urlpatterns)  # type: ignore[arg-type]
+        ),
     }
 )

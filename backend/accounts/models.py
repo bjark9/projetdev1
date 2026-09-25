@@ -15,12 +15,12 @@ class User(AbstractUser):
     # model (unused, but still present since django.contrib.auth is
     # installed) defines groups/user_permissions with related_name
     # "user_set" too. Overriding related_name here avoids the clash.
-    groups = models.ManyToManyField(
+    groups = models.ManyToManyField(  # type: ignore[assignment]
         "auth.Group",
         related_name="accounts_user_set",
         blank=True,
     )
-    user_permissions = models.ManyToManyField(
+    user_permissions = models.ManyToManyField(  # type: ignore[assignment]
         "auth.Permission",
         related_name="accounts_user_permissions_set",
         blank=True,
