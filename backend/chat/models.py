@@ -14,7 +14,7 @@ class Conversation(models.Model):
         related_name="conversations",
     )
     is_group = models.BooleanField(default=False)
-    name = models.CharField(max_length=255, blank=True, null=True)  # used for group chats
+    name = models.CharField(max_length=255, blank=True)  # used for group chats
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 

@@ -1,4 +1,8 @@
-# Handles the actual WebSocket connection per conversation: on connect it checks the user is authenticated and is a participant in that conversation (so no one can eavesdrop on chats they're not in), then joins a "room group" named after the conversation ID. Incoming messages get saved to the DB and broadcast to everyone in that group.
+# Handles the actual WebSocket connection per conversation: 
+# on connect it checks the user is authenticated and is a participant in that conversation 
+# (so no one can eavesdrop on chats they're not in), 
+# then joins a "room group" named after the conversation ID. 
+# Incoming messages get saved to the DB and broadcast to everyone in that group.
 import json
 
 from channels.db import database_sync_to_async
