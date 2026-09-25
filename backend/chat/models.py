@@ -43,4 +43,4 @@ class Message(models.Model):
         ordering = ["created_at"]
 
     def __str__(self) -> str:
-        return self.name or f"Message {self.pk}"
+        return self.content or f"Message {self.pk}"
