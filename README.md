@@ -1,8 +1,8 @@
-# [À COMPLÉTER : nom du projet]
+# [Projet: Chat App]
 
 [![CI](https://github.com/bjark9/projetdev1/actions/workflows/ci.yml/badge.svg)](https://github.com/bjark9/projetdev1/actions/workflows/ci.yml)
 
-[À COMPLÉTER : 2 à 3 phrases qui expliquent ce que fait l'application, pour qui, et quel problème elle résout.]
+[Une application de chat temps réel pour équipes (B2B) — pensez Slack, Teams ou Discord, version professionnelle.]
 
 Projet 1 du cours *Projet d'intégration de développement*.
 
@@ -22,19 +22,19 @@ Projet 1 du cours *Projet d'intégration de développement*.
 
 ## Fonctionnalités
 
-- [À COMPLÉTER : fonctionnalité 1, par exemple « envoyer et lire des messages dans une conversation »]
-- [À COMPLÉTER : fonctionnalité 2, par exemple « gestion des membres et des permissions »]
+- [Fonctionnalité 1: envoyer et lire des messages dans une conversation]
+- [Fonctionnalité 2: gestion des membres et des permissions ]
 - [À COMPLÉTER : fonctionnalité 3]
 
 ## Stack technique
 
 | Couche | Technologie |
 | --- | --- |
-| Backend | [À COMPLÉTER : framework et langage] |
-| Frontend | [À COMPLÉTER : framework] |
-| Base de données | [À COMPLÉTER : SQLite / MySQL / PostgreSQL] |
+| Backend | [Django - Python ] |
+| Frontend | [React] |
+| Base de données | [SQLite / MYSQL ??] |
 | Tests | [À COMPLÉTER : Pest / pytest / Vitest…] |
-| Lint / style | [À COMPLÉTER : Pint / ruff / ESLint…] |
+| Lint / style | [ruff / ESLint / Prettier] |
 | CI/CD | GitHub Actions |
 | Hébergement | [À COMPLÉTER : hébergeur] |
 
