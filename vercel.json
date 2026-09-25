@@ -5,7 +5,7 @@
     },
     "backend": {
       "root": "backend/",
-      "entrypoint": "mysite.wsgi:application"
+      "entrypoint": "mysite.asgi:application"
     }
   },
   "rewrites": [

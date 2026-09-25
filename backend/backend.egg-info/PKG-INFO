@@ -1,0 +1,12 @@
+Metadata-Version: 2.4
+Name: backend
+Version: 0.1.0
+Requires-Python: >=3.12
+Requires-Dist: Django==6.1.1
+Requires-Dist: djangorestframework==3.18.0
+Requires-Dist: channels==4.3.2
+Requires-Dist: daphne==4.2.3
+Requires-Dist: dj-database-url==3.1.2
+Requires-Dist: psycopg2-binary==2.9.13
+Requires-Dist: whitenoise==6.12.0
+Requires-Dist: django-cors-headers==4.9.0

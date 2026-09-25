@@ -1,3 +1,26 @@
+[project]
+name = "backend"
+version = "0.1.0"
+requires-python = ">=3.12"
+dependencies = [
+    "Django==6.1.1",
+    "djangorestframework==3.18.0",
+    "channels==4.3.2",
+    "daphne==4.2.3",
+    "dj-database-url==3.1.2",
+    "psycopg2-binary==2.9.13",
+    "whitenoise==6.12.0",
+    "django-cors-headers==4.9.0",
+]
+
+[build-system]
+requires = ["setuptools>=75"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+include = ["accounts*", "chat*", "mysite*"]
+
+
 [tool.ruff]
 line-length = 120
 exclude = ["**/migrations", ".venv"]
@@ -10,4 +33,4 @@ plugins = ["mypy_django_plugin.main"]
 check_untyped_defs = true
 
 [tool.django-stubs]
-django_settings_module = "mysite.settings-example"
+django_settings_module = "mysite.settings"
