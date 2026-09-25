@@ -8,7 +8,7 @@ class Conversation(models.Model):
         related_name="conversations",
     )
     is_group = models.BooleanField(default=False)
-    name = models.CharField(max_length=255, blank=True) #add null = true ?
+    name = models.CharField(max_length=255, blank=True)  # add null = true ?
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
