@@ -1,4 +1,7 @@
 {
+  "env": {
+    "PYTHONPATH": "backend"
+  },
   "services": {
     "frontend": {
       "root": "frontend/"
