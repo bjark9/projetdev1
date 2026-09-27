@@ -17,6 +17,10 @@ function App() {
     },
   ])
 
+  function startRoom() {
+    
+  }
+
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
     const trimmedMessage = message.trim()
@@ -61,7 +65,7 @@ function App() {
             decisions, and the little moments in between.
           </p>
           <div className="hero-actions">
-            <a className="button button-primary" href="#demo">
+            <a className="button button-primary" onClick={startRoom} href="#demo">
               Start a room <span aria-hidden="true">↗</span>
             </a>
             <a className="text-link" href="#ritual">
