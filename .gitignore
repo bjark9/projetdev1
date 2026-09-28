@@ -2,3 +2,5 @@
 __pycache__/
 *.pyc
 infos.txt
+.vercel
+.env.development.local
