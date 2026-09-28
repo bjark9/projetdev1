@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import type { FormEvent } from 'react'
+import { useNavigate } from 'react-router-dom'
 import './App.css'
 
 function App() {
@@ -16,9 +17,11 @@ function App() {
       time: '09:42',
     },
   ])
+  
+  const navigate = useNavigate()
 
   function startRoom() {
-    
+    navigate('/room')
   }
 
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
@@ -65,7 +68,7 @@ function App() {
             decisions, and the little moments in between.
           </p>
           <div className="hero-actions">
-            <a className="button button-primary" onClick={startRoom} href="#demo">
+            <a className="button button-primary" onClick={startRoom}>
               Start a room <span aria-hidden="true">↗</span>
             </a>
             <a className="text-link" href="#ritual">

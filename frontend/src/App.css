@@ -253,6 +253,9 @@ h2 em {
   align-items: center;
   display: flex;
 }
+.room-section {
+  margin-left: 10px;
+}
 .chat-topbar {
   justify-content: space-between;
 }
