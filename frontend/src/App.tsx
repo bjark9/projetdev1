@@ -17,7 +17,7 @@ function App() {
       time: '09:42',
     },
   ])
-  
+
   const navigate = useNavigate()
 
   function startConversation() {
@@ -64,8 +64,8 @@ function App() {
             <em>good</em> conversation.
           </h1>
           <p className="hero-description">
-            Relay brings your people together in focused conversations made for ideas,
-            decisions, and the little moments in between.
+            Relay brings your people together in focused conversations made for
+            ideas, decisions, and the little moments in between.
           </p>
           <div className="hero-actions">
             <a className="button button-primary" onClick={startConversation}>
@@ -82,7 +82,10 @@ function App() {
               <span className="avatar avatar-three">M</span>
               <span className="avatar avatar-four">+</span>
             </div>
-            <span>Join 100000000000000000000000000000000000000000000000+ thoughtful teams</span>
+            <span>
+              Join 100000000000000000000000000000000000000000000000+ thoughtful
+              teams
+            </span>
           </div>
         </div>
         <div className="hero-visual" id="demo">
@@ -94,7 +97,10 @@ function App() {
               <div className="conversation-title">
                 <span className="conversation-status" /> morning / studio
               </div>
-              <button className="icon-button" aria-label="More conversation options">
+              <button
+                className="icon-button"
+                aria-label="More conversation options"
+              >
                 •••
               </button>
             </div>
