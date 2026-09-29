@@ -88,15 +88,7 @@ TEMPLATES = [
 
 WSGI_APPLICATION = "mysite.wsgi.application"
 
-ASGI_APPLICATION = "mysite.asgi.application"
-
-# Backend simple pour les groupes WebSocket pendant le développement local.
-# En production, il faudra utiliser Redis pour partager les messages entre serveurs.
-CHANNEL_LAYERS = {
-    "default": {
-        "BACKEND": "channels.layers.InMemoryChannelLayer",
-    },
-}
+ASGI_APPLICATION = 'mysite.asgi.application'
 
 
 # Database

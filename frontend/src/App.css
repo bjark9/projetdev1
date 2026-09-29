@@ -28,7 +28,7 @@ a {
   text-decoration: none;
 }
 ul {
-  list-style-type:none;
+  list-style-type: none;
 }
 main {
   overflow: hidden;
@@ -251,13 +251,13 @@ h2 em {
   transform: rotate(1.6deg);
 }
 .chat-topbar,
-.room-title,
+.conversation-title,
 .message-head {
   align-items: center;
   display: flex;
 }
-.room-section {
-  --room-button-width: 180px;
+.conversation-section {
+  --conversation-button-width: 180px;
   width: min(200px, calc(100% - 80px));
   /* same left offset as .nav-shell */
   margin-left: calc((100% - min(1160px, 100% - 80px)) / 2);
@@ -265,18 +265,18 @@ h2 em {
   padding: 40px 48px 40px 0;
   border-right: 1px solid var(--line);
 }
-.room-section .button-primary,
-.room-row-button {
-  width: var(--room-button-width);
+.conversation-section .button-primary,
+.conversation-row-button {
+  width: var(--conversation-button-width);
 }
-.room-list {
+.conversation-list {
   display: grid;
   gap: 12px;
   margin: 24px 0 0;
   padding: 0; /* removes the default ul indent */
 }
 
-.room-row-button {
+.conversation-row-button {
   background: #fff;
   border: 1px solid var(--line);
   color: var(--ink);
@@ -289,22 +289,22 @@ h2 em {
   text-align: left;
 }
 
-.room-row-button:hover {
+.conversation-row-button:hover {
   border-color: var(--coral);
   transform: translateY(-2px);
 }
 
-.room-row-main {
+.conversation-row-main {
   align-items: center;
   display: flex;
 }
 
-.room-row-name {
+.conversation-row-name {
   font-family: var(--serif);
   font-size: 16px;
 }
 
-.room-row-meta {
+.conversation-row-meta {
   color: var(--muted);
   font-family: var(--mono);
   font-size: 9px;
@@ -314,11 +314,11 @@ h2 em {
 .chat-topbar {
   justify-content: space-between;
 }
-.room-title {
+.conversation-title {
   font-family: var(--serif);
   font-size: 21px;
 }
-.room-status {
+.conversation-status {
   background: #85b8a5;
   border-radius: 50%;
   height: 8px;
