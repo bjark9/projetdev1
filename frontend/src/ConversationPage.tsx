@@ -3,24 +3,24 @@ import type { FormEvent } from 'react'
 import { useNavigate } from 'react-router-dom'
 import './App.css'
 
-type Room = {
+type Conversation = {
   id: string
   name: string
   memberCount: number
   lastActive: string
 }
-
-const initialRooms: Room[] = [
+/* TODO: make this reactive (with database) */ 
+const initialConversations: Conversation[] = [
   { id: 'morning-studio', name: 'morning / studio', memberCount: 7, lastActive: 'active now' },
   { id: 'design-crit', name: 'design / crit', memberCount: 4, lastActive: '12m ago' },
   { id: 'weekend-plans', name: 'weekend / plans', memberCount: 3, lastActive: '1h ago' },
 ]
 
-function RoomPage() {
+function ConversationPage() {
   const navigate = useNavigate()
-  const [rooms, setRooms] = useState<Room[]>(initialRooms)
+  const [conversations, setConversations] = useState<Conversation[]>(initialConversations)
   const [isCreating, setIsCreating] = useState(false)
-  const [newRoomName, setNewRoomName] = useState('')
+  const [newConversationName, setNewConversationName] = useState('')
 
   function openCreateForm() {
     setIsCreating(true)
@@ -28,28 +28,28 @@ function RoomPage() {
 
   function cancelCreate() {
     setIsCreating(false)
-    setNewRoomName('')
+    setNewConversationName('')
   }
 
-  function handleCreateRoom(event: FormEvent<HTMLFormElement>) {
+  function handleCreateConversation(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
-    const trimmedName = newRoomName.trim()
+    const trimmedName = newConversationName.trim()
     if (!trimmedName) return
 
-    const newRoom: Room = {
+    const newConversation: Conversation = {
       id: trimmedName.toLowerCase().replace(/\s+/g, '-'),
       name: trimmedName,
       memberCount: 1,
       lastActive: 'just created',
     }
 
-    setRooms((currentRooms) => [newRoom, ...currentRooms])
-    setNewRoomName('')
+    setConversations((currentConversations) => [newConversation, ...currentConversations])
+    setNewConversationName('')
     setIsCreating(false)
   }
 
-  function enterRoom(roomId: string) {
-    navigate(`/room/${roomId}`)
+  function enterConversation(conversationId: string) {
+    navigate(`/conversation/${conversationId}`)
   }
 
   return (
@@ -66,7 +66,7 @@ function RoomPage() {
         </div>
       </nav>
 
-      <section className="room-section" id="top">
+      <section className="conversation-section" id="top">
         <div className="section-intro">
           <p className="eyebrow">
             <span className="eyebrow-line" /> Your spaces
@@ -74,17 +74,17 @@ function RoomPage() {
         </div>
 
         {isCreating ? (
-          <form className="room-create-form" onSubmit={handleCreateRoom}>
+          <form className="conversation-create-form" onSubmit={handleCreateConversation}>
             <input
-              aria-label="New room name"
+              aria-label="New conversation name"
               autoFocus
-              value={newRoomName}
-              onChange={(event) => setNewRoomName(event.target.value)}
-              placeholder="Name your room..."
+              value={newConversationName}
+              onChange={(event) => setNewConversationName(event.target.value)}
+              placeholder="Name your conversation..."
             />
             <div className="room-create-actions">
               <button type="submit" className="button button-primary">
-                Create room <span aria-hidden="true">↗</span>
+                Create conversation <span aria-hidden="true">↗</span>
               </button>
               <button type="button" className="text-link" onClick={cancelCreate}>
                 Cancel
@@ -93,34 +93,34 @@ function RoomPage() {
           </form>
         ) : (
           <button className="button button-primary" onClick={openCreateForm}>
-            Create a room <span aria-hidden="true">↗</span>
+            Create a conversation <span aria-hidden="true">↗</span>
           </button>
         )}
 
-        <ul className="room-list">
-          {rooms.map((room) => (
-            <li className="room-row" key={room.id}>
-              <button className="room-row-button" onClick={() => enterRoom(room.id)}>
-                <div className="room-row-main">
-                  <span className="room-status" />
-                  <span className="room-row-name">{room.name}</span>
+        <ul className="conversation-list">
+          {conversations.map((conversation) => (
+            <li className="conversation-row" key={conversation.id}>
+              <button className="conversation-row-button" onClick={() => enterConversation(conversation.id)}>
+                <div className="conversation-row-main">
+                  <span className="conversation-status" />
+                  <span className="conversation-row-name">{conversation.name}</span>
                 </div>
-                <div className="room-row-meta">
-                  <span>{room.memberCount} people</span>
+                <div className="conversation-row-meta">
+                  <span>{conversation.memberCount} people</span>
                   <span className="meta-divider" />
-                  <span className="meta-muted">{room.lastActive}</span>
+                  <span className="meta-muted">{conversation.lastActive}</span>
                 </div>
               </button>
             </li>
           ))}
         </ul>
 
-        {rooms.length === 0 && (
-          <p className="room-empty">No rooms yet — create one to get started.</p>
+        {conversations.length === 0 && (
+          <p className="conversation-empty">No conversations yet — create one to get started.</p>
         )}
       </section>
     </main>
   )
 }
 
-export default RoomPage
+export default ConversationPage
