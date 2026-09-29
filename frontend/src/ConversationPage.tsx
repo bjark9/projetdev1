@@ -9,16 +9,32 @@ type Conversation = {
   memberCount: number
   lastActive: string
 }
-/* TODO: make this reactive (with database) */ 
+/* TODO: make this reactive (with database) */
 const initialConversations: Conversation[] = [
-  { id: 'morning-studio', name: 'morning / studio', memberCount: 7, lastActive: 'active now' },
-  { id: 'design-crit', name: 'design / crit', memberCount: 4, lastActive: '12m ago' },
-  { id: 'weekend-plans', name: 'weekend / plans', memberCount: 3, lastActive: '1h ago' },
+  {
+    id: 'morning-studio',
+    name: 'morning / studio',
+    memberCount: 7,
+    lastActive: 'active now',
+  },
+  {
+    id: 'design-crit',
+    name: 'design / crit',
+    memberCount: 4,
+    lastActive: '12m ago',
+  },
+  {
+    id: 'weekend-plans',
+    name: 'weekend / plans',
+    memberCount: 3,
+    lastActive: '1h ago',
+  },
 ]
 
 function ConversationPage() {
   const navigate = useNavigate()
-  const [conversations, setConversations] = useState<Conversation[]>(initialConversations)
+  const [conversations, setConversations] =
+    useState<Conversation[]>(initialConversations)
   const [isCreating, setIsCreating] = useState(false)
   const [newConversationName, setNewConversationName] = useState('')
 
@@ -43,7 +59,10 @@ function ConversationPage() {
       lastActive: 'just created',
     }
 
-    setConversations((currentConversations) => [newConversation, ...currentConversations])
+    setConversations((currentConversations) => [
+      newConversation,
+      ...currentConversations,
+    ])
     setNewConversationName('')
     setIsCreating(false)
   }
@@ -74,7 +93,10 @@ function ConversationPage() {
         </div>
 
         {isCreating ? (
-          <form className="conversation-create-form" onSubmit={handleCreateConversation}>
+          <form
+            className="conversation-create-form"
+            onSubmit={handleCreateConversation}
+          >
             <input
               aria-label="New conversation name"
               autoFocus
@@ -86,7 +108,11 @@ function ConversationPage() {
               <button type="submit" className="button button-primary">
                 Create conversation <span aria-hidden="true">↗</span>
               </button>
-              <button type="button" className="text-link" onClick={cancelCreate}>
+              <button
+                type="button"
+                className="text-link"
+                onClick={cancelCreate}
+              >
                 Cancel
               </button>
             </div>
@@ -100,10 +126,15 @@ function ConversationPage() {
         <ul className="conversation-list">
           {conversations.map((conversation) => (
             <li className="conversation-row" key={conversation.id}>
-              <button className="conversation-row-button" onClick={() => enterConversation(conversation.id)}>
+              <button
+                className="conversation-row-button"
+                onClick={() => enterConversation(conversation.id)}
+              >
                 <div className="conversation-row-main">
                   <span className="conversation-status" />
-                  <span className="conversation-row-name">{conversation.name}</span>
+                  <span className="conversation-row-name">
+                    {conversation.name}
+                  </span>
                 </div>
                 <div className="conversation-row-meta">
                   <span>{conversation.memberCount} people</span>
@@ -116,7 +147,9 @@ function ConversationPage() {
         </ul>
 
         {conversations.length === 0 && (
-          <p className="conversation-empty">No conversations yet — create one to get started.</p>
+          <p className="conversation-empty">
+            No conversations yet — create one to get started.
+          </p>
         )}
       </section>
     </main>
