@@ -8,7 +8,7 @@ function App() {
   const [messages, setMessages] = useState([
     {
       author: 'Maya',
-      text: 'The new room feels really good. Less noise, more signal.',
+      text: 'The new conversation feels really good. Less noise, more signal.',
       time: '09:41',
     },
     {
@@ -17,11 +17,11 @@ function App() {
       time: '09:42',
     },
   ])
-  
+
   const navigate = useNavigate()
 
-  function startRoom() {
-    navigate('/room')
+  function startConversation() {
+    navigate('/conversation')
   }
 
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
@@ -45,7 +45,7 @@ function App() {
           relay<span className="brand-dot">.</span>
         </a>
         <div className="nav-links">
-          <a href="#rooms">Rooms</a>
+          <a href="#conversations">Conversations</a>
           <a href="#ritual">Our approach</a>
           <a href="#footer">About</a>
         </div>
@@ -59,17 +59,17 @@ function App() {
             <span className="eyebrow-line" /> A calmer place to talk
           </p>
           <h1>
-            Make room for
+            Make space for
             <br />
             <em>good</em> conversation.
           </h1>
           <p className="hero-description">
-            Relay brings your people together in focused rooms made for ideas,
-            decisions, and the little moments in between.
+            Relay brings your people together in focused conversations made for
+            ideas, decisions, and the little moments in between.
           </p>
           <div className="hero-actions">
-            <a className="button button-primary" onClick={startRoom}>
-              Start a room <span aria-hidden="true">↗</span>
+            <a className="button button-primary" onClick={startConversation}>
+              Start a conversation <span aria-hidden="true">↗</span>
             </a>
             <a className="text-link" href="#ritual">
               See how it works <span aria-hidden="true">↓</span>
@@ -82,26 +82,32 @@ function App() {
               <span className="avatar avatar-three">M</span>
               <span className="avatar avatar-four">+</span>
             </div>
-            <span>Join 2,400+ thoughtful teams</span>
+            <span>
+              Join 100000000000000000000000000000000000000000000000+ thoughtful
+              teams
+            </span>
           </div>
         </div>
         <div className="hero-visual" id="demo">
           <div className="visual-note note-top">
-            in the room <strong>●</strong>
+            in the conversation <strong>●</strong>
           </div>
           <div className="chat-window">
             <div className="chat-topbar">
-              <div className="room-title">
-                <span className="room-status" /> morning / studio
+              <div className="conversation-title">
+                <span className="conversation-status" /> morning / studio
               </div>
-              <button className="icon-button" aria-label="More room options">
+              <button
+                className="icon-button"
+                aria-label="More conversation options"
+              >
                 •••
               </button>
             </div>
             <div className="chat-meta">
               <span>7 people</span>
               <span className="meta-divider" />{' '}
-              <span className="meta-muted">private room</span>
+              <span className="meta-muted">private conversation</span>
             </div>
             <div className="message-list">
               {messages.map((chatMessage, index) => (
@@ -159,7 +165,7 @@ function App() {
           <b>✦</b>
         </div>
       </section>
-      <section className="feature-section" id="rooms">
+      <section className="feature-section" id="conversations">
         <div className="section-intro">
           <p className="eyebrow">
             <span className="eyebrow-line" /> Made for humans
@@ -167,7 +173,7 @@ function App() {
           <h2>
             The internet is loud.
             <br />
-            <em>Your room doesn't have to be.</em>
+            <em>Your conversation doesn't have to be.</em>
           </h2>
         </div>
         <div className="feature-grid">
@@ -176,12 +182,12 @@ function App() {
             <h3>Gather with intention</h3>
             <p>
               Give every conversation a place to land. Create small, focused
-              rooms that feel easy to return to.
+              conversations that feel easy to return to.
             </p>
             <a
               className="arrow-link"
               href="#demo"
-              aria-label="Explore gathering rooms"
+              aria-label="Explore gathering conversations"
             >
               ↗
             </a>
@@ -254,7 +260,7 @@ function App() {
         </a>
         <span>© 2026 Relay Studio</span>
         <div className="footer-links">
-          <a href="#rooms">Rooms</a>
+          <a href="#conversations">Conversations</a>
           <a href="#ritual">Manifesto</a>
           <a href="#top">Contact</a>
         </div>

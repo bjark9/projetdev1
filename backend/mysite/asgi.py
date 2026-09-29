@@ -9,7 +9,6 @@ https://docs.djangoproject.com/en/6.1/howto/deployment/asgi/
 
 import os
 import sys
-
 from pathlib import Path
 
 from channels.auth import AuthMiddlewareStack

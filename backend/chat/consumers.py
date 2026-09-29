@@ -1,7 +1,7 @@
 # Handles the actual WebSocket connection per conversation:
 # on connect it checks the user is authenticated and is a participant in that conversation
 # (so no one can eavesdrop on chats they're not in),
-# then joins a "room group" named after the conversation ID.
+# then joins a conversation group named after the conversation ID.
 # Incoming messages get saved to the DB and broadcast to everyone in that group.
 import json
 from typing import Any, cast
@@ -22,7 +22,7 @@ class ChatConsumer(AsyncWebsocketConsumer):
     async def connect(self):
         self.user = cast(User, self.scope["user"])
         self.conversation_id = self.scope["url_route"]["kwargs"]["conversation_id"]
-        self.room_group_name = f"chat_{self.conversation_id}"
+        self.conversation_group_name = f"chat_{self.conversation_id}"
 
         if not self.user.is_authenticated:
             await self.close()
@@ -33,11 +33,11 @@ class ChatConsumer(AsyncWebsocketConsumer):
             await self.close()
             return
 
-        await self.channel_layer.group_add(self.room_group_name, self.channel_name)
+        await self.channel_layer.group_add(self.conversation_group_name, self.channel_name)
         await self.accept()
 
     async def disconnect(self, close_code):
-        await self.channel_layer.group_discard(self.room_group_name, self.channel_name)
+        await self.channel_layer.group_discard(self.conversation_group_name, self.channel_name)
 
     async def receive(
         self,
@@ -55,7 +55,7 @@ class ChatConsumer(AsyncWebsocketConsumer):
         message = await self.save_message(content)
 
         await self.channel_layer.group_send(
-            self.room_group_name,
+            self.conversation_group_name,
             {
                 "type": "chat_message",
                 "message_id": message.id,
