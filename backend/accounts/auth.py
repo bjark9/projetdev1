@@ -5,10 +5,11 @@ from rest_framework.authentication import BaseAuthentication
 from rest_framework.exceptions import AuthenticationFailed
 from django.contrib.auth import get_user_model
 
-User = get_user_model()
+User = get_user_model() # This method will return the currently active user model (in this case, inside accounts/models)
 
 clerk = Clerk(bearer_auth=os.environ["CLERK_SECRET_KEY"])
 
+# Check token that gets send by react and answer "who is this?", so it returns the user:
 class ClerkAuthentication(BaseAuthentication):
     def authenticate(self, request):
         state = clerk.authenticate_request(
