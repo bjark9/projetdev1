@@ -87,7 +87,15 @@ TEMPLATES = [
 
 WSGI_APPLICATION = "mysite.wsgi.application"
 
-ASGI_APPLICATION = 'mysite.asgi.application'
+ASGI_APPLICATION = "mysite.asgi.application"
+
+# Backend local utilisé par Channels pour diffuser les messages WebSocket.
+# En production, Redis remplacera ce stockage en mémoire.
+CHANNEL_LAYERS = {
+    "default": {
+        "BACKEND": "channels.layers.InMemoryChannelLayer",
+    },
+}
 
 
 # Database

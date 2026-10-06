@@ -1,11 +1,15 @@
+from __future__ import annotations
+
 from django.conf import settings
 from django.db import models
+
+from accounts.models import User
 
 
 class Group(models.Model):
     name = models.CharField(max_length=255, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
-    members = models.ManyToManyField(
+    members: models.ManyToManyField[User, User] = models.ManyToManyField(
         settings.AUTH_USER_MODEL,
         through="Membership",
         related_name="chat_groups",

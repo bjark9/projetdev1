@@ -7,7 +7,7 @@ from django.test import TransactionTestCase
 
 from mysite.asgi import application
 
-from .models import Conversation, Message
+from .models import Conversation, Group, Membership, Message
 
 User = get_user_model()
 
@@ -15,8 +15,9 @@ User = get_user_model()
 class ChatConsumerTests(TransactionTestCase):
     def test_member_can_send_and_receive_a_message(self):
         user = User.objects.create_user(username="alice", password="password")
-        conversation = Conversation.objects.create(name="general")
-        conversation.participants.add(user)
+        group = Group.objects.create(name="general")
+        Membership.objects.create(group=group, user=user)
+        conversation = Conversation.objects.create(group=group, name="general")
 
         async_to_sync(self.check_websocket)(conversation.id, user)
 
@@ -25,14 +26,16 @@ class ChatConsumerTests(TransactionTestCase):
 
     def test_non_member_cannot_connect(self):
         user = User.objects.create_user(username="mallory", password="password")
-        conversation = Conversation.objects.create(name="general")
+        group = Group.objects.create(name="general")
+        conversation = Conversation.objects.create(group=group, name="general")
 
         async_to_sync(self.check_rejected_websocket)(conversation.id, user)
 
     def test_empty_message_is_not_saved(self):
         user = User.objects.create_user(username="alice", password="password")
-        conversation = Conversation.objects.create(name="general")
-        conversation.participants.add(user)
+        group = Group.objects.create(name="general")
+        Membership.objects.create(group=group, user=user)
+        conversation = Conversation.objects.create(group=group, name="general")
 
         async_to_sync(self.check_empty_message)(conversation.id, user)
 
