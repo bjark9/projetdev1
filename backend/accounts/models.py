@@ -6,6 +6,7 @@ class User(AbstractUser):
     """
     Custom user model, extending Django's built-in auth User.
     """
+
     # Clerk
     clerk_id = models.CharField(max_length=255, unique=True, null=True, blank=True)
 

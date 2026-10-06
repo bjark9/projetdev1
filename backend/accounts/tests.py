@@ -25,9 +25,7 @@ class ClerkWebhookTests(TestCase):
                 "first_name": "Relay",
                 "last_name": "User",
                 "primary_email_address_id": "email_1",
-                "email_addresses": [
-                    {"id": "email_1", "email_address": "relay@example.com"}
-                ],
+                "email_addresses": [{"id": "email_1", "email_address": "relay@example.com"}],
             },
         }
 
@@ -42,9 +40,7 @@ class ClerkWebhookTests(TestCase):
                         "first_name": "Relay",
                         "last_name": "User",
                         "primary_email_address_id": "email_1",
-                        "email_addresses": [
-                            {"id": "email_1", "email_address": "relay@example.com"}
-                        ],
+                        "email_addresses": [{"id": "email_1", "email_address": "relay@example.com"}],
                     },
                 }
             ),
@@ -73,9 +69,7 @@ class ClerkWebhookTests(TestCase):
             "data": {
                 "id": "user_123",
                 "username": "new-name",
-                "email_addresses": [
-                    {"id": "email_1", "email_address": "new@example.com"}
-                ],
+                "email_addresses": [{"id": "email_1", "email_address": "new@example.com"}],
                 "primary_email_address_id": "email_1",
             },
         }
@@ -88,9 +82,7 @@ class ClerkWebhookTests(TestCase):
                     "data": {
                         "id": "user_123",
                         "username": "new-name",
-                        "email_addresses": [
-                            {"id": "email_1", "email_address": "new@example.com"}
-                        ],
+                        "email_addresses": [{"id": "email_1", "email_address": "new@example.com"}],
                         "primary_email_address_id": "email_1",
                     },
                 }
@@ -150,9 +142,7 @@ class ClerkWebhookTests(TestCase):
         message_id = "msg_test"
         timestamp = str(int(time.time()))
         signed_content = f"{message_id}.{timestamp}.{body.decode()}".encode()
-        signature = base64.b64encode(
-            hmac.new(SIGNING_KEY, signed_content, hashlib.sha256).digest()
-        ).decode()
+        signature = base64.b64encode(hmac.new(SIGNING_KEY, signed_content, hashlib.sha256).digest()).decode()
 
         response = self.client.post(
             "/api/webhooks/clerk/",

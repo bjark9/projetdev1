@@ -30,11 +30,7 @@ class Membership(models.Model):
     joined_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
-        constraints = [
-            models.UniqueConstraint(
-                fields=["user", "group"], name="unique_user_per_group"
-            )
-        ]
+        constraints = [models.UniqueConstraint(fields=["user", "group"], name="unique_user_per_group")]
 
     def __str__(self) -> str:
         return f"{self.user} in {self.group}"

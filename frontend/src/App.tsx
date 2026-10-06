@@ -51,15 +51,15 @@ function App() {
           <a href="#footer">About</a>
         </div>
         <>
-        <header>
-          <Show when="signed-out">
-            <SignInButton />
-            <SignUpButton />
-          </Show>
-          <Show when="signed-in">
-            <UserButton />
-          </Show>
-        </header>
+          <header>
+            <Show when="signed-out">
+              <SignInButton />
+              <SignUpButton />
+            </Show>
+            <Show when="signed-in">
+              <UserButton />
+            </Show>
+          </header>
         </>
       </nav>
       <section className="hero-section" id="top">

@@ -30,9 +30,7 @@ class MessageSerializer(serializers.ModelSerializer):
         # Only members of the conversation's group can post in it
         request = self.context["request"]
         if not conversation.group.memberships.filter(user=request.user).exists():
-            raise serializers.ValidationError(
-                "You are not a member of this conversation's group."
-            )
+            raise serializers.ValidationError("You are not a member of this conversation's group.")
         return conversation
 
 
@@ -72,9 +70,7 @@ class GroupCreateSerializer(serializers.ModelSerializer):
         users = validated_data.pop("member_ids")
         with transaction.atomic():
             group = Group.objects.create(**validated_data)
-            Membership.objects.bulk_create(
-                [Membership(group=group, user=u) for u in users]
-            )
+            Membership.objects.bulk_create([Membership(group=group, user=u) for u in users])
         return group
 
     def to_representation(self, instance):
