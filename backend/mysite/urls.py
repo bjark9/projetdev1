@@ -25,4 +25,5 @@ urlpatterns = [
     path("admin/", admin.site.urls),
     path("api/webhooks/clerk/", clerk_webhook, name="clerk-webhook"),
     path("api-auth/", include("rest_framework.urls")),
+    path("api/", include("chat.urls")),
 ]
