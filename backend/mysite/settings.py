@@ -35,12 +35,11 @@ SECRET_KEY = os.environ.get("DJANGO_SECRET_KEY", "dev-insecure-key")
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = os.environ.get("DJANGO_DEBUG", "False") == "True"
 
-ALLOWED_HOSTS = [
-    host.strip() for host in os.environ.get("ALLOWED_HOSTS", "127.0.0.1,localhost").split(",") if host.strip()
-]
+ALLOWED_HOSTS = ["localhost", "127.0.0.1", ".ngrok-free.app", "hedging-outspoken-granular.ngrok-free.dev"]
 
 # Telling Django to use the user model
-# AUTH_USER_MODEL = 'mysite.User'
+AUTH_USER_MODEL = "accounts.User"
+CLERK_WEBHOOK_SIGNING_SECRET = os.environ.get("CLERK_WEBHOOK_SIGNING_SECRET", "")
 
 
 # Application definition
