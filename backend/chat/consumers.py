@@ -82,10 +82,7 @@ class ChatConsumer(AsyncWebsocketConsumer):
 
     @database_sync_to_async
     def is_conversation_participant(self):
-        return Conversation.objects.filter(
-            id=self.conversation_id,
-            group__members=self.user
-        ).exists()
+        return Conversation.objects.filter(id=self.conversation_id, group__members=self.user).exists()
 
     @database_sync_to_async
     def save_message(self, content):
