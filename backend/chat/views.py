@@ -3,7 +3,11 @@
 # C'est elle qui reçoit la requête HTTP, vérifie l'authentification et les permissions,
 # choisit quelles données récupérer (le queryset),
 # puis fait appel au serializer pour fabriquer la réponse.
-from rest_framework import mixins, permissions, viewsets
+from django.contrib.auth import get_user_model
+from django.shortcuts import get_object_or_404
+from rest_framework import mixins, permissions, status, viewsets
+from rest_framework.decorators import action
+from rest_framework.response import Response
 
 from .models import Conversation, Group, Message
 from .serializers import (
@@ -13,6 +17,8 @@ from .serializers import (
     GroupSerializer,
     MessageSerializer,
 )
+
+User = get_user_model()
 
 
 class GroupViewSet(
@@ -34,6 +40,27 @@ class GroupViewSet(
 
     def get_serializer_class(self):
         return GroupCreateSerializer if self.action == "create" else GroupSerializer
+
+    @action(detail=True, methods=["post"], url_path="members")
+    def add_member(self, request, pk=None):
+        group = self.get_object()
+        user = get_object_or_404(User, pk=request.data.get("user_id"))
+        membership, created = group.memberships.get_or_create(user=user)
+
+        serializer = GroupSerializer(group, context={"request": request})
+        return Response(serializer.data, status=status.HTTP_201_CREATED if created else status.HTTP_200_OK)
+
+    @action(
+        detail=True,
+        methods=["delete"],
+        url_path=r"members/(?P<user_id>[^/.]+)",
+    )
+    def remove_member(self, request, user_id, pk=None):
+        group = self.get_object()
+        deleted, _ = group.memberships.filter(user_id=user_id).delete()
+        if not deleted:
+            return Response(status=status.HTTP_404_NOT_FOUND)
+        return Response(status=status.HTTP_204_NO_CONTENT)
 
 
 class ConversationViewSet(
