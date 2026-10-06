@@ -35,7 +35,11 @@ class ChatConsumer(AsyncWebsocketConsumer):
             return
 
         await self.channel_layer.group_add(self.conversation_group_name, self.channel_name)
-        await self.accept()
+        clerk_subprotocol = cast(str | None, self.scope.get("clerk_subprotocol"))
+        if clerk_subprotocol:
+            await self.accept(subprotocol=clerk_subprotocol)
+        else:
+            await self.accept()
 
     async def disconnect(self, close_code):
         await self.channel_layer.group_discard(self.conversation_group_name, self.channel_name)
