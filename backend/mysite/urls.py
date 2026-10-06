@@ -23,6 +23,8 @@ from accounts.webhooks import clerk_webhook
 urlpatterns = [
     # path("polls/", include("polls.urls")),
     path("admin/", admin.site.urls),
+    # Routes API pour les groupes, conversations et messages.
+    path("api/", include("chat.urls")),
     path("api/webhooks/clerk/", clerk_webhook, name="clerk-webhook"),
     path("api-auth/", include("rest_framework.urls")),
 ]
