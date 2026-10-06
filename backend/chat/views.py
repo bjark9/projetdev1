@@ -49,13 +49,15 @@ class ConversationViewSet(
     def get_queryset(self):
         return (
             Conversation.objects.filter(group__memberships__user=self.request.user.pk)
-            .select_related("group") # Sélectionne le groupe associé à chaque conversation
-            .prefetch_related("group__members") # Précharge les membres du groupe associé à chaque conversation
-            .order_by("-updated_at") # Trie les conversations par date de mise à jour décroissante
+            .select_related("group")  # Sélectionne le groupe associé à chaque conversation
+            .prefetch_related("group__members")  # Précharge les membres du groupe associé à chaque conversation
+            .order_by("-updated_at")  # Trie les conversations par date de mise à jour décroissante
         )
 
     def get_serializer_class(self):
-        return ConversationCreateSerializer if self.action == "create" else ConversationSerializer # Utilise ConversationCreateSerializer pour la création et ConversationSerializer pour les autres actions
+        return (
+            ConversationCreateSerializer if self.action == "create" else ConversationSerializer
+        )  # Utilise ConversationCreateSerializer pour la création et ConversationSerializer pour les autres actions
 
 
 class MessageViewSet(
@@ -72,12 +74,14 @@ class MessageViewSet(
     permission_classes = [permissions.IsAuthenticated]
 
     def get_queryset(self):
-        qs = (
+        qs = (  # Récupère les messages des conversations auxquelles l'utilisateur appartient
             Message.objects.filter(conversation__group__memberships__user=self.request.user.pk)
             .select_related("sender")
             .order_by("-created_at")  # newest first: easier to paginate; reverse in React
         )
-        conversation_id = self.request.query_params.get("conversation") # Récupère l'ID de la conversation à partir des paramètres de requête
+        conversation_id = self.request.query_params.get(
+            "conversation"
+        )  # Récupère l'ID de la conversation à partir des paramètres de requête
         if conversation_id:
             qs = qs.filter(conversation_id=conversation_id)
         return qs
