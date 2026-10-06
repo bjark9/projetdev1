@@ -92,7 +92,7 @@ def clerk_webhook(request: HttpRequest) -> HttpResponse:
         return HttpResponse("Clerk webhook signing secret is not configured", status=500)
 
     try:
-        Webhook(signing_secret).verify(request.body, request.headers)
+        Webhook(signing_secret).verify(request.body, dict(request.headers))
     except WebhookVerificationError:
         logger.warning("Rejected Clerk webhook with an invalid signature")
         return HttpResponse("Invalid webhook signature", status=400)

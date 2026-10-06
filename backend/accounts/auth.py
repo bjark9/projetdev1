@@ -19,7 +19,7 @@ class ClerkAuthentication(BaseAuthentication):
                 authorized_parties=["http://localhost:5173"]  # your frontend origin
             ),
         )
-        if not state.is_signed_in:
+        if not state.is_signed_in or state.payload is None:
             raise AuthenticationFailed("Not signed in")
         clerk_id = state.payload.get("sub")
         if not clerk_id:
