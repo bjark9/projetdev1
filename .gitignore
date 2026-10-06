@@ -4,3 +4,5 @@ __pycache__/
 infos.txt
 .vercel
 .env.development.local
+todo.txt
+node_modules
