@@ -22,7 +22,6 @@ from accounts.webhooks import clerk_webhook
 from mysite.debug_views import debug_db
 
 urlpatterns = [
-    # path("polls/", include("polls.urls")),
     path("admin/", admin.site.urls),
     path("api/debug-db/", debug_db, name="debug-db"),
     path("api/webhooks/clerk/", clerk_webhook, name="clerk-webhook"),

@@ -10,8 +10,12 @@ from django.http import JsonResponse
 def debug_db(request):
     expected_token = os.environ.get("DEBUG_DB_TOKEN")
     provided_token = request.GET.get("token")
-    if not expected_token or provided_token != expected_token:
-        return JsonResponse({"detail": "Not found."}, status=404)
+    if not expected_token:
+        return JsonResponse({"detail": "no env var set"}, status=404)
+    if not provided_token:
+        return JsonResponse({"detail": "token missing"}, status=404)
+    if provided_token != expected_token:
+        return JsonResponse({"detail": "token wrong"}, status=404)
 
     try:
         user_model = get_user_model()
