@@ -2,6 +2,7 @@ import { useState } from 'react'
 import type { FormEvent } from 'react'
 import { useNavigate } from 'react-router-dom'
 import './App.css'
+import { Show, SignInButton, SignUpButton, UserButton } from '@clerk/react'
 
 function App() {
   const [message, setMessage] = useState('')
@@ -49,9 +50,17 @@ function App() {
           <a href="#ritual">Our approach</a>
           <a href="#footer">About</a>
         </div>
-        <a className="nav-login" href="#demo">
-          Log in <span aria-hidden="true">↗</span>
-        </a>
+        <>
+          <header>
+            <Show when="signed-out">
+              <SignInButton />
+              <SignUpButton />
+            </Show>
+            <Show when="signed-in">
+              <UserButton />
+            </Show>
+          </header>
+        </>
       </nav>
       <section className="hero-section" id="top">
         <div className="hero-copy">

@@ -8,7 +8,8 @@ from typing import Any, cast
 
 from channels.db import database_sync_to_async
 from channels.generic.websocket import AsyncWebsocketConsumer
-from django.contrib.auth.models import User
+
+from accounts.models import User
 
 from .models import Conversation, Message
 
@@ -82,10 +83,7 @@ class ChatConsumer(AsyncWebsocketConsumer):
 
     @database_sync_to_async
     def is_conversation_participant(self):
-        return Conversation.objects.filter(
-            id=self.conversation_id,
-            participants=self.user,
-        ).exists()
+        return Conversation.objects.filter(id=self.conversation_id, group__members=self.user).exists()
 
     @database_sync_to_async
     def save_message(self, content):
