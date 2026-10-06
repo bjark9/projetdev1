@@ -3,7 +3,8 @@ from typing import cast
 from asgiref.sync import async_to_sync
 from channels.testing import WebsocketCommunicator
 from django.contrib.auth import get_user_model
-from django.test import TransactionTestCase
+from django.test import TestCase, TransactionTestCase
+from rest_framework.test import APIClient
 
 from mysite.asgi import application
 
@@ -83,3 +84,90 @@ class ChatConsumerTests(TransactionTestCase):
         self.assertTrue(await communicator.receive_nothing(timeout=0.1))
 
         await communicator.disconnect()
+
+
+class GroupApiTests(TestCase):
+    def setUp(self):
+        self.api_client = APIClient()
+        self.alice = User.objects.create_user(username="alice")
+        self.bob = User.objects.create_user(username="bob")
+
+    def test_member_can_create_group(self):
+        self.api_client.force_authenticate(user=self.alice)
+
+        response = self.api_client.post(
+            "/api/groups/",
+            {
+                "name": "Equipe de projet",
+                "member_ids": [self.bob.id],
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 201)
+        self.assertEqual(Group.objects.count(), 1)
+        self.assertEqual(Membership.objects.count(), 2)
+
+    def test_member_can_list_his_groups(self):
+        group = Group.objects.create(name="Equipe de projet")
+        Membership.objects.create(group=group, user=self.alice)
+
+        self.api_client.force_authenticate(user=self.alice)
+        response = self.api_client.get("/api/groups/")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(len(response.data), 1)
+        self.assertEqual(response.data[0]["name"], "Equipe de projet")
+
+    def test_non_member_cannot_retrieve_group(self):
+        group = Group.objects.create(name="Equipe de projet")
+        Membership.objects.create(group=group, user=self.alice)
+
+        self.api_client.force_authenticate(user=self.bob)
+        response = self.api_client.get(f"/api/groups/{group.id}/")
+
+        self.assertEqual(response.status_code, 404)
+
+    def test_member_can_create_conversation(self):
+        group = Group.objects.create(name="Equipe de projet")
+        Membership.objects.create(group=group, user=self.alice)
+
+        self.api_client.force_authenticate(user=self.alice)
+        response = self.api_client.post(
+            "/api/conversations/",
+            {"group": group.id, "name": "General"},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 201)
+        self.assertEqual(Conversation.objects.count(), 1)
+
+    def test_member_can_send_message(self):
+        group = Group.objects.create(name="Equipe de projet")
+        Membership.objects.create(group=group, user=self.alice)
+        conversation = Conversation.objects.create(group=group, name="General")
+
+        self.api_client.force_authenticate(user=self.alice)
+        response = self.api_client.post(
+            "/api/messages/",
+            {"conversation": conversation.id, "content": "Bonjour"},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 201)
+        self.assertEqual(Message.objects.get().content, "Bonjour")
+
+    def test_non_member_cannot_send_message(self):
+        group = Group.objects.create(name="Equipe de projet")
+        Membership.objects.create(group=group, user=self.alice)
+        conversation = Conversation.objects.create(group=group, name="General")
+
+        self.api_client.force_authenticate(user=self.bob)
+        response = self.api_client.post(
+            "/api/messages/",
+            {"conversation": conversation.id, "content": "Message interdit"},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(Message.objects.count(), 0)
