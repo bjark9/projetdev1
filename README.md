@@ -36,7 +36,7 @@ Projet 1 du cours *Projet d'intégration de développement*.
 | Tests | [À COMPLÉTER : Pest / pytest / Vitest…] |
 | Lint / style | [ruff / ESLint / Prettier] |
 | CI/CD | GitHub Actions |
-| Hébergement | [À COMPLÉTER : hébergeur] |
+| Hébergement | Versel |
 
 ## Structure du dépôt
 
@@ -145,4 +145,4 @@ Le pipeline GitHub Actions (`.github/workflows/ci.yml`) se lance sur chaque pull
 
 ## Licence
 
-Projet réalisé dans un cadre académique. [À COMPLÉTER : licence éventuelle]
+Projet réalisé dans un cadre académique.
