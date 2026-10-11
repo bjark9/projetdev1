@@ -1,73 +1,52 @@
-import { useState } from 'react'
-import type { FormEvent } from 'react'
+import { useAuth } from '@clerk/react'
+import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import './App.css'
 
 type Conversation = {
-  id: string
+  id: number
   name: string
-  memberCount: number
-  lastActive: string
+  updated_at: string
+  group: {
+    members: unknown[]
+  }
 }
-/* TODO: make this reactive (with database) */
-const initialConversations: Conversation[] = [
-  {
-    id: 'morning-studio',
-    name: 'morning / studio',
-    memberCount: 7,
-    lastActive: 'active now',
-  },
-  {
-    id: 'design-crit',
-    name: 'design / crit',
-    memberCount: 4,
-    lastActive: '12m ago',
-  },
-  {
-    id: 'weekend-plans',
-    name: 'weekend / plans',
-    memberCount: 3,
-    lastActive: '1h ago',
-  },
-]
+
+const backendUrl = import.meta.env.VITE_BACKEND_URL ?? 'http://localhost:8000'
 
 function ConversationPage() {
   const navigate = useNavigate()
-  const [conversations, setConversations] =
-    useState<Conversation[]>(initialConversations)
-  const [isCreating, setIsCreating] = useState(false)
-  const [newConversationName, setNewConversationName] = useState('')
+  const { getToken, isLoaded, isSignedIn } = useAuth()
+  const [conversations, setConversations] = useState<Conversation[]>([])
+  const [error, setError] = useState('')
 
-  function openCreateForm() {
-    setIsCreating(true)
-  }
+  useEffect(() => {
+    if (!isLoaded || !isSignedIn) return
 
-  function cancelCreate() {
-    setIsCreating(false)
-    setNewConversationName('')
-  }
+    async function loadConversations() {
+      const token = await getToken()
+      if (!token) {
+        setError('Connexion Clerk nécessaire')
+        return
+      }
 
-  function handleCreateConversation(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault()
-    const trimmedName = newConversationName.trim()
-    if (!trimmedName) return
-
-    const newConversation: Conversation = {
-      id: trimmedName.toLowerCase().replace(/\s+/g, '-'),
-      name: trimmedName,
-      memberCount: 1,
-      lastActive: 'just created',
+      try {
+        const response = await fetch(`${backendUrl}/api/conversations/`, {
+          headers: { Authorization: `Bearer ${token}` },
+        })
+        if (!response.ok) {
+          throw new Error('Impossible de charger les conversations')
+        }
+        setConversations((await response.json()) as Conversation[])
+      } catch {
+        setError('Impossible de charger les conversations')
+      }
     }
 
-    setConversations((currentConversations) => [
-      newConversation,
-      ...currentConversations,
-    ])
-    setNewConversationName('')
-    setIsCreating(false)
-  }
+    void loadConversations()
+  }, [getToken, isLoaded, isSignedIn])
 
-  function enterConversation(conversationId: string) {
+  function enterConversation(conversationId: number) {
     navigate(`/conversation/${conversationId}`)
   }
 
@@ -92,36 +71,7 @@ function ConversationPage() {
           </p>
         </div>
 
-        {isCreating ? (
-          <form
-            className="conversation-create-form"
-            onSubmit={handleCreateConversation}
-          >
-            <input
-              aria-label="New conversation name"
-              autoFocus
-              value={newConversationName}
-              onChange={(event) => setNewConversationName(event.target.value)}
-              placeholder="Name your conversation..."
-            />
-            <div className="room-create-actions">
-              <button type="submit" className="button button-primary">
-                Create conversation <span aria-hidden="true">↗</span>
-              </button>
-              <button
-                type="button"
-                className="text-link"
-                onClick={cancelCreate}
-              >
-                Cancel
-              </button>
-            </div>
-          </form>
-        ) : (
-          <button className="button button-primary" onClick={openCreateForm}>
-            Create a conversation <span aria-hidden="true">↗</span>
-          </button>
-        )}
+        {error && <p className="conversation-empty">{error}</p>}
 
         <ul className="conversation-list">
           {conversations.map((conversation) => (
@@ -137,9 +87,11 @@ function ConversationPage() {
                   </span>
                 </div>
                 <div className="conversation-row-meta">
-                  <span>{conversation.memberCount} people</span>
+                  <span>{conversation.group.members.length} people</span>
                   <span className="meta-divider" />
-                  <span className="meta-muted">{conversation.lastActive}</span>
+                  <span className="meta-muted">
+                    {new Date(conversation.updated_at).toLocaleString()}
+                  </span>
                 </div>
               </button>
             </li>

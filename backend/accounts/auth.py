@@ -8,7 +8,7 @@ from rest_framework.exceptions import AuthenticationFailed
 
 User = get_user_model()
 
-clerk = Clerk(bearer_auth=os.environ["CLERK_SECRET_KEY"])
+clerk = Clerk(bearer_auth=os.environ.get("CLERK_SECRET_KEY", ""))
 
 
 class ClerkAuthentication(BaseAuthentication):
