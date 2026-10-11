@@ -31,7 +31,9 @@ from accounts.clerk_websocket import ClerkWebSocketMiddleware  # noqa: E402
 
 application = ProtocolTypeRouter(
     {
+        # Les requêtes classiques passent par Django.
         "http": django_asgi_app,
+        # Les WebSockets passent par Clerk, les sessions Django puis le routing chat.
         "websocket": AuthMiddlewareStack(
             ClerkWebSocketMiddleware(
                 URLRouter(chat.routing.websocket_urlpatterns)  # type: ignore[arg-type]

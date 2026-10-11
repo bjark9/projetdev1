@@ -32,6 +32,7 @@ class GroupViewSet(
     permission_classes = [permissions.IsAuthenticated]
 
     def get_queryset(self):
+        # Le queryset filtre les groupes visibles: un non-membre ne les reçoit pas.
         return (
             Group.objects.filter(memberships__user=self.request.user.pk)
             .prefetch_related("members")
@@ -43,6 +44,7 @@ class GroupViewSet(
 
     @action(detail=True, methods=["post"], url_path="members")
     def add_member(self, request, pk=None):
+        # get_object() utilise le queryset ci-dessus: seuls les membres peuvent gérer le groupe.
         group = self.get_object()
         user = get_object_or_404(User, pk=request.data.get("user_id"))
         membership, created = group.memberships.get_or_create(user=user)
@@ -56,6 +58,7 @@ class GroupViewSet(
         url_path=r"members/(?P<user_id>[^/.]+)",
     )
     def remove_member(self, request, user_id, pk=None):
+        # Une suppression réussie renvoie 204; un lien inexistant renvoie 404.
         group = self.get_object()
         deleted, _ = group.memberships.filter(user_id=user_id).delete()
         if not deleted:
@@ -74,6 +77,7 @@ class ConversationViewSet(
     permission_classes = [permissions.IsAuthenticated]
 
     def get_queryset(self):
+        # Une conversation est accessible si l'utilisateur appartient à son groupe.
         return (
             Conversation.objects.filter(group__memberships__user=self.request.user.pk)
             .select_related("group")  # Sélectionne le groupe associé à chaque conversation
@@ -101,6 +105,7 @@ class MessageViewSet(
     permission_classes = [permissions.IsAuthenticated]
 
     def get_queryset(self):
+        # L'historique est limité aux conversations des groupes de l'utilisateur.
         qs = (  # Récupère les messages des conversations auxquelles l'utilisateur appartient
             Message.objects.filter(conversation__group__memberships__user=self.request.user.pk)
             .select_related("sender")
@@ -114,6 +119,7 @@ class MessageViewSet(
         return qs
 
     def perform_create(self, serializer):
+        # Le client ne choisit jamais l'expéditeur: il vient du token Clerk.
         # The sender always comes from the authenticated user, never from the client
         message = serializer.save(sender=self.request.user)
 

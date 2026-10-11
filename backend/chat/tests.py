@@ -15,6 +15,7 @@ User = get_user_model()
 
 class ChatConsumerTests(TransactionTestCase):
     def test_member_can_send_and_receive_a_message(self):
+        # Prépare un groupe réel: le WebSocket doit vérifier le membership.
         user = User.objects.create_user(username="alice", password="password")
         group = Group.objects.create(name="general")
         Membership.objects.create(group=group, user=user)
@@ -26,6 +27,7 @@ class ChatConsumerTests(TransactionTestCase):
         self.assertEqual(Message.objects.get().content, "Bonjour")
 
     def test_non_member_cannot_connect(self):
+        # Le groupe existe, mais l'utilisateur n'en est pas membre.
         user = User.objects.create_user(username="mallory", password="password")
         group = Group.objects.create(name="general")
         conversation = Conversation.objects.create(group=group, name="general")
@@ -33,6 +35,7 @@ class ChatConsumerTests(TransactionTestCase):
         async_to_sync(self.check_rejected_websocket)(conversation.id, user)
 
     def test_empty_message_is_not_saved(self):
+        # Un message composé uniquement d'espaces ne doit pas entrer en base.
         user = User.objects.create_user(username="alice", password="password")
         group = Group.objects.create(name="general")
         Membership.objects.create(group=group, user=user)
@@ -43,6 +46,7 @@ class ChatConsumerTests(TransactionTestCase):
         self.assertEqual(Message.objects.count(), 0)
 
     async def check_websocket(self, conversation_id, user):
+        # WebsocketCommunicator simule un navigateur connecté au consumer ASGI.
         communicator = WebsocketCommunicator(
             application,
             f"/ws/chat/{conversation_id}/",
@@ -53,6 +57,7 @@ class ChatConsumerTests(TransactionTestCase):
         self.assertTrue(connected)
 
         await communicator.send_json_to({"content": "Bonjour"})
+        # Le consumer enregistre puis renvoie le message au groupe.
         response = await communicator.receive_json_from()
 
         self.assertEqual(response["content"], "Bonjour")
@@ -93,6 +98,7 @@ class GroupApiTests(TestCase):
         self.bob = User.objects.create_user(username="bob")
 
     def test_member_can_create_group(self):
+        # Le serializer ajoute automatiquement Alice comme membre créateur.
         self.api_client.force_authenticate(user=self.alice)
 
         response = self.api_client.post(
@@ -120,6 +126,7 @@ class GroupApiTests(TestCase):
         self.assertEqual(response.data[0]["name"], "Equipe de projet")
 
     def test_non_member_cannot_retrieve_group(self):
+        # L'absence du groupe dans le queryset produit un 404 pour Bob.
         group = Group.objects.create(name="Equipe de projet")
         Membership.objects.create(group=group, user=self.alice)
 
@@ -158,6 +165,7 @@ class GroupApiTests(TestCase):
         self.assertEqual(Message.objects.get().content, "Bonjour")
 
     def test_non_member_cannot_send_message(self):
+        # La validation du serializer bloque l'écriture hors du groupe.
         group = Group.objects.create(name="Equipe de projet")
         Membership.objects.create(group=group, user=self.alice)
         conversation = Conversation.objects.create(group=group, name="General")

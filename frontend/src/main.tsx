@@ -9,12 +9,14 @@ import ConversationPage from './ConversationPage'
 
 const PUBLISHABLE_KEY = import.meta.env.VITE_CLERK_PUBLISHABLE_KEY
 
+// L'application ne démarre pas si la clé publique Clerk n'est pas configurée.
 if (!PUBLISHABLE_KEY) {
   throw new Error('Missing VITE_CLERK_PUBLISHABLE_KEY in .env')
 }
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
+    {/* Clerk fournit l'utilisateur connecté aux pages qui en ont besoin. */}
     <ClerkProvider publishableKey={PUBLISHABLE_KEY}>
       <BrowserRouter>
         <Routes>

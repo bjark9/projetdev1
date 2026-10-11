@@ -3,6 +3,7 @@ from rest_framework.routers import DefaultRouter
 from .views import ConversationViewSet, GroupViewSet, MessageViewSet
 
 router = DefaultRouter()
+# Le router génère automatiquement les routes GET/POST des ViewSets.
 router.register("groups", GroupViewSet, basename="group")
 router.register("conversations", ConversationViewSet, basename="conversation")
 router.register("messages", MessageViewSet, basename="message")

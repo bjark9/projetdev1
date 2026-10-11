@@ -59,6 +59,7 @@ INSTALLED_APPS = [
 ]
 
 REST_FRAMEWORK = {
+    # Toutes les routes API utilisent le token Clerk fourni par le frontend.
     "DEFAULT_AUTHENTICATION_CLASSES": [
         "accounts.auth.ClerkAuthentication",
     ],

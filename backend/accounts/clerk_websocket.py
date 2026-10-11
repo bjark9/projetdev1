@@ -14,7 +14,7 @@ Send = Callable[[dict[str, Any]], Awaitable[None]]
 
 
 class ClerkWebSocketMiddleware:
-    """Authenticates a WebSocket with the Clerk token sent as a subprotocol."""
+    """Authentifie un WebSocket avec un token Clerk envoyé comme sous-protocole."""
 
     def __init__(self, app):
         self.app = app
@@ -23,6 +23,7 @@ class ClerkWebSocketMiddleware:
         if scope["type"] != "websocket":
             return await self.app(scope, receive, send)
 
+        # Sans sous-protocole Clerk, on conserve le mode local/session des tests.
         token = self._get_token(scope)
         if not token:
             return await self.app(scope, receive, send)
@@ -31,11 +32,13 @@ class ClerkWebSocketMiddleware:
 
         authenticated_scope = dict(scope)
         authenticated_scope["user"] = user
+        # Le consumer renverra ce sous-protocole lors de l'acceptation.
         authenticated_scope["clerk_subprotocol"] = "clerk" if token else None
         return await self.app(authenticated_scope, receive, send)
 
     @staticmethod
     def _get_token(scope: Scope) -> str | None:
+        # Le frontend envoie exactement: new WebSocket(url, ["clerk", token]).
         protocols = scope.get("subprotocols", [])
         if len(protocols) == 2 and protocols[0] == "clerk":
             return protocols[1]
@@ -44,6 +47,7 @@ class ClerkWebSocketMiddleware:
     @staticmethod
     async def _get_user(token: str):
         try:
+            # La vérification utilise le même secret Clerk que l'auth HTTP.
             payload = await verify_token_async(
                 token,
                 VerifyTokenOptions(
@@ -57,6 +61,7 @@ class ClerkWebSocketMiddleware:
         clerk_id = payload.get("sub")
         if not clerk_id:
             return AnonymousUser()
+        # L'ORM est exécuté dans un thread avec database_sync_to_async.
         return await ClerkWebSocketMiddleware._find_user(clerk_id)
 
     @staticmethod

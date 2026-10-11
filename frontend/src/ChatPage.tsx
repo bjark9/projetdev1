@@ -14,6 +14,7 @@ type ChatMessage = {
 const backendUrl = import.meta.env.VITE_BACKEND_URL ?? 'http://localhost:8000'
 
 function websocketUrl(conversationId: string) {
+  // On réutilise l'URL backend pour fonctionner en local comme en production.
   const url = new URL(`/ws/chat/${conversationId}/`, backendUrl)
   url.protocol = url.protocol === 'https:' ? 'wss:' : 'ws:'
   return url.toString()
@@ -28,6 +29,7 @@ function ChatPage() {
   const [status, setStatus] = useState('Connexion...')
 
   useEffect(() => {
+    // Sans connexion Clerk ou sans ID, aucune requête ne doit partir.
     if (!conversationId || !isLoaded || !isSignedIn) return
 
     const currentConversationId = conversationId
@@ -40,6 +42,7 @@ function ChatPage() {
         return
       }
 
+      // On charge d'abord les anciens messages via l'API HTTP.
       const historyResponse = await fetch(
         `${backendUrl}/api/messages/?conversation=${currentConversationId}`,
         { headers: { Authorization: `Bearer ${token}` } },
@@ -49,6 +52,7 @@ function ChatPage() {
         setMessages(history.reverse())
       }
 
+      // Puis on ouvre le WebSocket pour les nouveaux messages en direct.
       const socket = new WebSocket(websocketUrl(currentConversationId), [
         'clerk',
         token,
@@ -57,6 +61,7 @@ function ChatPage() {
 
       socket.onopen = () => setStatus('Connecté')
       socket.onmessage = (event) => {
+        // Chaque événement reçu est ajouté à la fin de la conversation.
         const incomingMessage = JSON.parse(event.data) as ChatMessage
         setMessages((currentMessages) => [...currentMessages, incomingMessage])
       }
@@ -67,6 +72,7 @@ function ChatPage() {
     void connect()
 
     return () => {
+      // Quand on quitte la page, on ferme la connexion pour éviter une fuite.
       isCancelled = true
       socketRef.current?.close()
       socketRef.current = null
@@ -78,6 +84,7 @@ function ChatPage() {
     const content = message.trim()
     if (!content || socketRef.current?.readyState !== WebSocket.OPEN) return
 
+    // Le backend attend un objet JSON contenant le champ content.
     socketRef.current.send(JSON.stringify({ content }))
     setMessage('')
   }

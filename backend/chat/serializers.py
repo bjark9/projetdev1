@@ -27,6 +27,7 @@ class MessageSerializer(serializers.ModelSerializer):
         read_only_fields = ["id", "sender", "created_at", "edited_at", "read_by"]
 
     def validate_conversation(self, conversation):
+        # Cette validation protège aussi l'API HTTP, en plus du WebSocket.
         # Only members of the conversation's group can post in it
         request = self.context["request"]
         if not conversation.group.memberships.filter(user=request.user).exists():
@@ -58,6 +59,7 @@ class GroupCreateSerializer(serializers.ModelSerializer):
         read_only_fields = ["id"]
 
     def validate_member_ids(self, users):
+        # Le créateur est toujours ajouté, même si son ID n'est pas envoyé.
         # The creator is always part of the group; remove duplicates
         creator = self.context["request"].user
         unique = {u.pk: u for u in users}
@@ -67,6 +69,7 @@ class GroupCreateSerializer(serializers.ModelSerializer):
         return list(unique.values())
 
     def create(self, validated_data):
+        # Le groupe et ses memberships sont créés ensemble dans une transaction.
         users = validated_data.pop("member_ids")
         with transaction.atomic():
             group = Group.objects.create(**validated_data)
@@ -108,6 +111,7 @@ class ConversationCreateSerializer(serializers.ModelSerializer):
         read_only_fields = ["id"]
 
     def validate_group(self, group):
+        # Une conversation ne peut être créée que dans un groupe accessible.
         request = self.context["request"]
         if not group.memberships.filter(user=request.user).exists():
             raise serializers.ValidationError("You are not a member of this group.")

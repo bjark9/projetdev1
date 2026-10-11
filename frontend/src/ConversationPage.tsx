@@ -28,6 +28,7 @@ function ConversationPage() {
     if (!isLoaded || !isSignedIn) return
 
     async function loadConversations() {
+      // Le token Clerk accompagne chaque appel API protégé.
       const token = await getToken()
       if (!token) {
         setError('Connexion Clerk nécessaire')
@@ -41,6 +42,7 @@ function ConversationPage() {
         if (!response.ok) {
           throw new Error('Impossible de charger les conversations')
         }
+        // Django renvoie les IDs numériques utilisés par la route WebSocket.
         setConversations((await response.json()) as Conversation[])
       } catch {
         setError('Impossible de charger les conversations')
@@ -55,6 +57,7 @@ function ConversationPage() {
   }
 
   async function createConversation() {
+    // Un groupe est créé avant la conversation qui lui est rattachée.
     const token = await getToken()
     const parsedMemberId = Number(memberId)
 
@@ -72,6 +75,7 @@ function ConversationPage() {
     setIsCreating(true)
     setError('')
     try {
+      // Le backend ajoute automatiquement l'utilisateur connecté au groupe.
       const groupResponse = await fetch(`${backendUrl}/api/groups/`, {
         method: 'POST',
         headers: {
@@ -86,6 +90,7 @@ function ConversationPage() {
       if (!groupResponse.ok) throw new Error('Impossible de créer le groupe')
 
       const group = (await groupResponse.json()) as { id: number }
+      // La conversation utilise l'ID du groupe créé juste avant.
       const conversationResponse = await fetch(
         `${backendUrl}/api/conversations/`,
         {
@@ -105,6 +110,7 @@ function ConversationPage() {
       }
 
       const conversation = (await conversationResponse.json()) as Conversation
+      // On met à jour l'écran avec la réponse du serveur.
       setConversations((current) => [conversation, ...current])
       setGroupName('')
       setConversationName('')

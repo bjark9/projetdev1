@@ -7,6 +7,7 @@ from accounts.models import User
 
 
 class Group(models.Model):
+    # Un groupe rassemble les utilisateurs qui peuvent accéder à ses conversations.
     name = models.CharField(max_length=255, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     members: models.ManyToManyField[User, User] = models.ManyToManyField(
@@ -20,6 +21,7 @@ class Group(models.Model):
 
 
 class Membership(models.Model):
+    # Cette table relie un utilisateur à un groupe et pourra porter un rôle plus tard.
     user = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.CASCADE,
@@ -41,6 +43,7 @@ class Membership(models.Model):
 
 
 class Conversation(models.Model):
+    # Une conversation appartient à un groupe; ses membres sont donc indirects.
     group = models.ForeignKey(
         Group,
         on_delete=models.CASCADE,
@@ -58,6 +61,7 @@ class Conversation(models.Model):
 
 
 class Message(models.Model):
+    # Chaque message est lié à une conversation et à son expéditeur.
     conversation = models.ForeignKey(
         Conversation,
         on_delete=models.CASCADE,
