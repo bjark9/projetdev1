@@ -16,7 +16,7 @@ class ClerkAuthentication(BaseAuthentication):
         state = clerk.authenticate_request(
             request,
             AuthenticateRequestOptions(
-                authorized_parties=["http://localhost:5173"]  # your frontend origin
+                authorized_parties=["http://localhost:5173","https://projetdev1-dusky.vercel.app"]  
             ),
         )
         if not state.is_signed_in or state.payload is None:
