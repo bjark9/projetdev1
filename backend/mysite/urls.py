@@ -24,6 +24,8 @@ from mysite.debug_views import debug_db
 urlpatterns = [
     path("admin/", admin.site.urls),
     path("api/debug-db/", debug_db, name="debug-db"),
+    # Routes API pour les groupes, conversations et messages.
+    path("api/", include("chat.urls")),
     path("api/webhooks/clerk/", clerk_webhook, name="clerk-webhook"),
     path("api-auth/", include("rest_framework.urls")),
     path("api/", include("chat.urls")),

@@ -58,6 +58,16 @@ INSTALLED_APPS = [
     "chat",
 ]
 
+REST_FRAMEWORK = {
+    # Toutes les routes API utilisent le token Clerk fourni par le frontend.
+    "DEFAULT_AUTHENTICATION_CLASSES": [
+        "accounts.auth.ClerkAuthentication",
+    ],
+    "DEFAULT_PERMISSION_CLASSES": [
+        "rest_framework.permissions.IsAuthenticated",
+    ],
+}
+
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
@@ -89,8 +99,8 @@ WSGI_APPLICATION = "mysite.wsgi.application"
 
 ASGI_APPLICATION = "mysite.asgi.application"
 
-# Backend simple pour les groupes WebSocket pendant le développement local.
-# En production, il faudra utiliser Redis pour partager les messages entre serveurs.
+# Backend local utilisé par Channels pour diffuser les messages WebSocket.
+# En production, Redis remplacera ce stockage en mémoire.
 CHANNEL_LAYERS = {
     "default": {
         "BACKEND": "channels.layers.InMemoryChannelLayer",

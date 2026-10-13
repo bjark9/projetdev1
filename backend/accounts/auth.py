@@ -8,11 +8,14 @@ from rest_framework.exceptions import AuthenticationFailed
 
 User = get_user_model()
 
-clerk = Clerk(bearer_auth=os.environ["CLERK_SECRET_KEY"])
+# Le secret reste dans l'environnement. Une valeur vide permet aux tests locaux
+# utilisant force_authenticate de charger Django sans publier de secret.
+clerk = Clerk(bearer_auth=os.environ.get("CLERK_SECRET_KEY", ""))
 
 
 class ClerkAuthentication(BaseAuthentication):
     def authenticate(self, request):
+        # Clerk vérifie le token Bearer reçu dans la requête HTTP.
         state = clerk.authenticate_request(
             request,
             AuthenticateRequestOptions(
@@ -25,8 +28,10 @@ class ClerkAuthentication(BaseAuthentication):
         if not clerk_id:
             raise AuthenticationFailed("Clerk token does not contain a user id")
 
+        # Le token Clerk identifie l'utilisateur; les données métier restent dans Neon.
         user = User.objects.filter(clerk_id=clerk_id).first()
         if user is None:
+            # Si le webhook n'a pas encore créé l'utilisateur, on le synchronise ici.
             profile = clerk.users.get(user_id=clerk_id)
             username = (profile.username or clerk_id)[:150]
             if User.objects.exclude(clerk_id=clerk_id).filter(username=username).exists():
@@ -43,4 +48,5 @@ class ClerkAuthentication(BaseAuthentication):
                 user.set_unusable_password()
                 user.save(update_fields=["password"])
 
+        # DRF place ensuite cet utilisateur dans request.user.
         return (user, None)

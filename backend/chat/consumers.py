@@ -21,21 +21,29 @@ class ChatConsumer(AsyncWebsocketConsumer):
     """
 
     async def connect(self):
+        # Le middleware Clerk ou les tests placent l'utilisateur dans le scope ASGI.
         self.user = cast(User, self.scope["user"])
         self.conversation_id = self.scope["url_route"]["kwargs"]["conversation_id"]
         self.conversation_group_name = f"chat_{self.conversation_id}"
 
+        # Première barrière: une personne non connectée est refusée.
         if not self.user.is_authenticated:
             await self.close()
             return
 
+        # Deuxième barrière: il faut aussi être membre du groupe.
         is_participant = await self.is_conversation_participant()
         if not is_participant:
             await self.close()
             return
 
+        # Tous les membres rejoignent le même groupe Channels.
         await self.channel_layer.group_add(self.conversation_group_name, self.channel_name)
-        await self.accept()
+        clerk_subprotocol = cast(str | None, self.scope.get("clerk_subprotocol"))
+        if clerk_subprotocol:
+            await self.accept(subprotocol=clerk_subprotocol)
+        else:
+            await self.accept()
 
     async def disconnect(self, close_code):
         await self.channel_layer.group_discard(self.conversation_group_name, self.channel_name)
@@ -48,13 +56,16 @@ class ChatConsumer(AsyncWebsocketConsumer):
         if text_data is None:
             return
 
+        # Les messages WebSocket sont de petits objets JSON.
         data = json.loads(text_data)
         content = data.get("content", "").strip()
         if not content:
             return
 
+        # On sauvegarde avant de diffuser afin d'obtenir un ID et une date.
         message = await self.save_message(content)
 
+        # group_send transmet le message à tous les sockets de la conversation.
         await self.channel_layer.group_send(
             self.conversation_group_name,
             {
@@ -68,7 +79,7 @@ class ChatConsumer(AsyncWebsocketConsumer):
         )
 
     async def chat_message(self, event: dict[str, Any]) -> None:
-        # Called for every message broadcast to the group; sends it to this socket.
+        # Cette méthode est appelée pour chaque message diffusé au groupe.
         await self.send(
             text_data=json.dumps(
                 {
@@ -83,6 +94,7 @@ class ChatConsumer(AsyncWebsocketConsumer):
 
     @database_sync_to_async
     def is_conversation_participant(self):
+        # L'accès dépend du groupe lié à la conversation.
         return Conversation.objects.filter(id=self.conversation_id, group__members=self.user).exists()
 
     @database_sync_to_async

@@ -1,74 +1,129 @@
-import { useState } from 'react'
-import type { FormEvent } from 'react'
+import { useAuth } from '@clerk/react'
+import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import './App.css'
 
 type Conversation = {
-  id: string
+  id: number
   name: string
-  memberCount: number
-  lastActive: string
+  updated_at: string
+  group: {
+    members: unknown[]
+  }
 }
-/* TODO: make this reactive (with database) */
-const initialConversations: Conversation[] = [
-  {
-    id: 'morning-studio',
-    name: 'morning / studio',
-    memberCount: 7,
-    lastActive: 'active now',
-  },
-  {
-    id: 'design-crit',
-    name: 'design / crit',
-    memberCount: 4,
-    lastActive: '12m ago',
-  },
-  {
-    id: 'weekend-plans',
-    name: 'weekend / plans',
-    memberCount: 3,
-    lastActive: '1h ago',
-  },
-]
+
+const backendUrl = import.meta.env.VITE_BACKEND_URL ?? 'http://localhost:8000'
 
 function ConversationPage() {
   const navigate = useNavigate()
-  const [conversations, setConversations] =
-    useState<Conversation[]>(initialConversations)
+  const { getToken, isLoaded, isSignedIn } = useAuth()
+  const [conversations, setConversations] = useState<Conversation[]>([])
+  const [error, setError] = useState('')
+  const [groupName, setGroupName] = useState('')
+  const [conversationName, setConversationName] = useState('')
+  const [memberId, setMemberId] = useState('')
   const [isCreating, setIsCreating] = useState(false)
-  const [newConversationName, setNewConversationName] = useState('')
 
-  function openCreateForm() {
-    setIsCreating(true)
-  }
+  useEffect(() => {
+    if (!isLoaded || !isSignedIn) return
 
-  function cancelCreate() {
-    setIsCreating(false)
-    setNewConversationName('')
-  }
+    async function loadConversations() {
+      // Le token Clerk accompagne chaque appel API protégé.
+      const token = await getToken()
+      if (!token) {
+        setError('Connexion Clerk nécessaire')
+        return
+      }
 
-  function handleCreateConversation(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault()
-    const trimmedName = newConversationName.trim()
-    if (!trimmedName) return
-
-    const newConversation: Conversation = {
-      id: trimmedName.toLowerCase().replace(/\s+/g, '-'),
-      name: trimmedName,
-      memberCount: 1,
-      lastActive: 'just created',
+      try {
+        const response = await fetch(`${backendUrl}/api/conversations/`, {
+          headers: { Authorization: `Bearer ${token}` },
+        })
+        if (!response.ok) {
+          throw new Error('Impossible de charger les conversations')
+        }
+        // Django renvoie les IDs numériques utilisés par la route WebSocket.
+        setConversations((await response.json()) as Conversation[])
+      } catch {
+        setError('Impossible de charger les conversations')
+      }
     }
 
-    setConversations((currentConversations) => [
-      newConversation,
-      ...currentConversations,
-    ])
-    setNewConversationName('')
-    setIsCreating(false)
+    void loadConversations()
+  }, [getToken, isLoaded, isSignedIn])
+
+  function enterConversation(conversationId: number) {
+    navigate(`/conversation/${conversationId}`)
   }
 
-  function enterConversation(conversationId: string) {
-    navigate(`/conversation/${conversationId}`)
+  async function createConversation() {
+    // Un groupe est créé avant la conversation qui lui est rattachée.
+    const token = await getToken()
+    const parsedMemberId = Number(memberId)
+
+    if (!token) {
+      setError('Connexion Clerk nécessaire')
+      return
+    }
+    if (!groupName.trim() || !conversationName.trim() || !parsedMemberId) {
+      setError(
+        'Remplis le nom du groupe, le nom de la conversation et un ID membre',
+      )
+      return
+    }
+
+    setIsCreating(true)
+    setError('')
+    try {
+      // Le backend ajoute automatiquement l'utilisateur connecté au groupe.
+      const groupResponse = await fetch(`${backendUrl}/api/groups/`, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          name: groupName.trim(),
+          member_ids: [parsedMemberId],
+        }),
+      })
+      if (!groupResponse.ok) throw new Error('Impossible de créer le groupe')
+
+      const group = (await groupResponse.json()) as { id: number }
+      // La conversation utilise l'ID du groupe créé juste avant.
+      const conversationResponse = await fetch(
+        `${backendUrl}/api/conversations/`,
+        {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            group: group.id,
+            name: conversationName.trim(),
+          }),
+        },
+      )
+      if (!conversationResponse.ok) {
+        throw new Error('Impossible de créer la conversation')
+      }
+
+      const conversation = (await conversationResponse.json()) as Conversation
+      // On met à jour l'écran avec la réponse du serveur.
+      setConversations((current) => [conversation, ...current])
+      setGroupName('')
+      setConversationName('')
+      setMemberId('')
+    } catch (creationError) {
+      setError(
+        creationError instanceof Error
+          ? creationError.message
+          : 'Impossible de créer la conversation',
+      )
+    } finally {
+      setIsCreating(false)
+    }
   }
 
   return (
@@ -92,36 +147,42 @@ function ConversationPage() {
           </p>
         </div>
 
-        {isCreating ? (
-          <form
-            className="conversation-create-form"
-            onSubmit={handleCreateConversation}
+        {error && <p className="conversation-empty">{error}</p>}
+
+        <form
+          className="conversation-create-form"
+          onSubmit={(event) => {
+            event.preventDefault()
+            void createConversation()
+          }}
+        >
+          <input
+            aria-label="Nom du groupe"
+            value={groupName}
+            onChange={(event) => setGroupName(event.target.value)}
+            placeholder="Nom du groupe"
+          />
+          <input
+            aria-label="ID du membre"
+            inputMode="numeric"
+            value={memberId}
+            onChange={(event) => setMemberId(event.target.value)}
+            placeholder="ID du deuxième membre"
+          />
+          <input
+            aria-label="Nom de la conversation"
+            value={conversationName}
+            onChange={(event) => setConversationName(event.target.value)}
+            placeholder="Nom de la conversation"
+          />
+          <button
+            type="submit"
+            className="button button-primary"
+            disabled={isCreating}
           >
-            <input
-              aria-label="New conversation name"
-              autoFocus
-              value={newConversationName}
-              onChange={(event) => setNewConversationName(event.target.value)}
-              placeholder="Name your conversation..."
-            />
-            <div className="room-create-actions">
-              <button type="submit" className="button button-primary">
-                Create conversation <span aria-hidden="true">↗</span>
-              </button>
-              <button
-                type="button"
-                className="text-link"
-                onClick={cancelCreate}
-              >
-                Cancel
-              </button>
-            </div>
-          </form>
-        ) : (
-          <button className="button button-primary" onClick={openCreateForm}>
-            Create a conversation <span aria-hidden="true">↗</span>
+            {isCreating ? 'Création...' : 'Créer la conversation'}
           </button>
-        )}
+        </form>
 
         <ul className="conversation-list">
           {conversations.map((conversation) => (
@@ -137,9 +198,11 @@ function ConversationPage() {
                   </span>
                 </div>
                 <div className="conversation-row-meta">
-                  <span>{conversation.memberCount} people</span>
+                  <span>{conversation.group.members.length} people</span>
                   <span className="meta-divider" />
-                  <span className="meta-muted">{conversation.lastActive}</span>
+                  <span className="meta-muted">
+                    {new Date(conversation.updated_at).toLocaleString()}
+                  </span>
                 </div>
               </button>
             </li>
