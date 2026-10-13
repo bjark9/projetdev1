@@ -21,7 +21,7 @@ for path in (str(BASE_DIR), str(PROJECT_ROOT)):
     if path not in sys.path:
         sys.path.insert(0, path)
 
-os.environ.setdefault("DJANGO_SETTINGS_MODULE", "backend.mysite.settings")
+os.environ.setdefault("DJANGO_SETTINGS_MODULE", "mysite.settings")
 # Initialize Django ASGI application early to ensure the AppRegistry
 # is populated before importing code that may import ORM models.
 django_asgi_app = get_asgi_application()
