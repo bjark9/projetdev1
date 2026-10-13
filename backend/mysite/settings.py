@@ -58,6 +58,16 @@ INSTALLED_APPS = [
     "chat",
 ]
 
+REST_FRAMEWORK = {
+    # Toutes les routes API utilisent le token Clerk fourni par le frontend.
+    "DEFAULT_AUTHENTICATION_CLASSES": [
+        "accounts.auth.ClerkAuthentication",
+    ],
+    "DEFAULT_PERMISSION_CLASSES": [
+        "rest_framework.permissions.IsAuthenticated",
+    ],
+}
+
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
@@ -88,6 +98,14 @@ TEMPLATES = [
 WSGI_APPLICATION = "mysite.wsgi.application"
 
 ASGI_APPLICATION = "mysite.asgi.application"
+
+# Backend local utilisé par Channels pour diffuser les messages WebSocket.
+# En production, Redis remplacera ce stockage en mémoire.
+CHANNEL_LAYERS = {
+    "default": {
+        "BACKEND": "channels.layers.InMemoryChannelLayer",
+    },
+}
 
 
 # Database
@@ -125,6 +143,8 @@ TIME_ZONE = "UTC"
 USE_I18N = True
 
 USE_TZ = True
+
+DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
 
 # Static files (CSS, JavaScript, Images)
