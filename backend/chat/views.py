@@ -1,9 +1,3 @@
-# Create your views here.
-# La vue est le point d'entrée. 
-# C'est elle qui reçoit la requête HTTP, vérifie l'authentification et les permissions, 
-# choisit quelles données récupérer (le queryset), 
-# puis fait appel au serializer pour fabriquer la réponse.
-from rest_framework import mixins, permissions, viewsets
 # La vue est le point d'entrée.
 # C'est elle qui reçoit la requête HTTP, vérifie l'authentification et les permissions,
 # choisit quelles données récupérer (le queryset),
