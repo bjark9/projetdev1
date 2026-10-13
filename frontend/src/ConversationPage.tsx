@@ -87,7 +87,11 @@ function ConversationPage() {
           member_ids: [parsedMemberId],
         }),
       })
-      if (!groupResponse.ok) throw new Error('Impossible de créer le groupe')
+      if (!groupResponse.ok) {
+        const details = await groupResponse.text()
+        console.error('POST /api/groups/', groupResponse.status, details)
+        throw new Error(`Impossible de créer le groupe (${groupResponse.status})`)
+      }
 
       const group = (await groupResponse.json()) as { id: number }
       // La conversation utilise l'ID du groupe créé juste avant.
