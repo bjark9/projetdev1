@@ -94,6 +94,14 @@ Le fichier `.env.example` liste toutes les variables nécessaires. Copiez-le en 
 | --- | --- | --- |
 | [À COMPLÉTER] | [À COMPLÉTER] | [À COMPLÉTER] |
 
+### Synchronisation des utilisateurs Clerk vers Neon
+
+Django utilise `DATABASE_URL` pour se connecter à Neon et `accounts.User` comme modèle utilisateur. Appliquez les migrations sur la base Neon après le déploiement (`python manage.py migrate`).
+
+Dans le tableau de bord Clerk, créez un webhook vers `https://<votre-backend>/api/webhooks/clerk/` et abonnez-le aux événements `user.created`, `user.updated` et `session.created`. Ajoutez sa clé de signature (`whsec_...`) à l'environnement du backend sous `CLERK_WEBHOOK_SIGNING_SECRET`. Clerk vérifiera chaque livraison; les utilisateurs sont synchronisés de façon idempotente à la création ou à la connexion.
+
+Pour tester localement, exposez le backend à Clerk via un tunnel HTTPS et configurez l'URL du webhook avec cette adresse publique.
+
 ## Tests et qualité du code
 
 ```bash
