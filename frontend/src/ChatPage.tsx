@@ -11,13 +11,17 @@ type ChatMessage = {
   created_at: string
 }
 
-const backendUrl = import.meta.env.VITE_BACKEND_URL ?? 'http://localhost:8000'
+const backendUrl =
+  import.meta.env.VITE_BACKEND_URL ??
+  (import.meta.env.PROD ? '' : 'http://localhost:8000')
 
-function websocketUrl(conversationId: string) {
-  // On réutilise l'URL backend pour fonctionner en local comme en production.
-  const url = new URL(`/ws/chat/${conversationId}/`, backendUrl)
-  url.protocol = url.protocol === 'https:' ? 'wss:' : 'ws:'
-  return url.toString()
+function websocketUrl(conversationId: string, token: string) {
+  // http -> ws, https -> wss ; sans backendUrl, on reprend l'origine de la page.
+  const wsBase = backendUrl
+    ? backendUrl.replace(/^http/, 'ws')
+    : `${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}`
+
+  return `${wsBase}/api/ws/chat/${conversationId}/?token=${encodeURIComponent(token)}`
 }
 
 function ChatPage() {
@@ -53,10 +57,7 @@ function ChatPage() {
       }
 
       // Puis on ouvre le WebSocket pour les nouveaux messages en direct.
-      const socket = new WebSocket(websocketUrl(currentConversationId), [
-        'clerk',
-        token,
-      ])
+      const socket = new WebSocket(websocketUrl(currentConversationId, token))
       socketRef.current = socket
 
       socket.onopen = () => setStatus('Connecté')
