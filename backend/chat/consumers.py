@@ -12,6 +12,9 @@ from channels.generic.websocket import AsyncWebsocketConsumer
 from accounts.models import User
 
 from .models import Conversation, Message
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 class ChatConsumer(AsyncWebsocketConsumer):
@@ -23,6 +26,13 @@ class ChatConsumer(AsyncWebsocketConsumer):
     async def connect(self):
         # Le middleware Clerk ou les tests placent l'utilisateur dans le scope ASGI.
         self.user = cast(User, self.scope["user"])
+        user = self.scope["user"]
+        logger.warning(
+        "WS connect: conv=%s user_id=%s authenticated=%s",
+        self.scope["url_route"]["kwargs"]["conversation_id"],
+        getattr(user, "id", None),
+        getattr(user, "is_authenticated", False),
+)
         self.conversation_id = self.scope["url_route"]["kwargs"]["conversation_id"]
         self.conversation_group_name = f"chat_{self.conversation_id}"
 
