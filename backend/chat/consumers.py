@@ -4,6 +4,7 @@
 # then joins a conversation group named after the conversation ID.
 # Incoming messages get saved to the DB and broadcast to everyone in that group.
 import json
+import logging
 from typing import Any, cast
 
 from channels.db import database_sync_to_async
@@ -12,7 +13,6 @@ from channels.generic.websocket import AsyncWebsocketConsumer
 from accounts.models import User
 
 from .models import Conversation, Message
-import logging
 
 logger = logging.getLogger(__name__)
 
@@ -97,6 +97,7 @@ class ChatConsumer(AsyncWebsocketConsumer):
                     "content": event["content"],
                     "sender_id": event["sender_id"],
                     "sender_username": event["sender_username"],
+                    "is_mine": event["sender_id"] == self.user.id,
                     "created_at": event["created_at"],
                 }
             )

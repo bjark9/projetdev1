@@ -74,6 +74,7 @@ class ChatConsumerTests(TransactionTestCase):
 
         self.assertEqual(response["content"], "Bonjour")
         self.assertEqual(response["sender_username"], "alice")
+        self.assertTrue(response["is_mine"])
 
         await communicator.disconnect()
 
@@ -89,7 +90,9 @@ class ChatConsumerTests(TransactionTestCase):
         bob_message = await communicators[1].receive_json_from()
 
         self.assertEqual(alice_message["content"], "Bonjour")
-        self.assertEqual(bob_message, alice_message)
+        self.assertTrue(alice_message["is_mine"])
+        self.assertFalse(bob_message["is_mine"])
+        self.assertEqual(bob_message["sender_username"], "alice")
 
         await communicators[0].disconnect()
         await communicators[1].disconnect()
@@ -192,6 +195,30 @@ class GroupApiTests(TestCase):
 
         self.assertEqual(response.status_code, 201)
         self.assertEqual(Message.objects.get().content, "Bonjour")
+
+    def test_message_history_includes_sender_name_and_ownership(self):
+        group = Group.objects.create(name="Equipe de projet")
+        Membership.objects.create(group=group, user=self.alice)
+        Membership.objects.create(group=group, user=self.bob)
+        conversation = Conversation.objects.create(group=group, name="General")
+        message = Message.objects.create(
+            conversation=conversation,
+            sender=self.alice,
+            content="Bonjour",
+        )
+
+        self.api_client.force_authenticate(user=self.bob)
+        response = self.api_client.get(f"/api/messages/?conversation={conversation.id}")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data[0]["id"], message.id)
+        self.assertEqual(response.data[0]["sender"]["username"], "alice")
+        self.assertFalse(response.data[0]["is_mine"])
+
+        self.api_client.force_authenticate(user=self.alice)
+        own_history = self.api_client.get(f"/api/messages/?conversation={conversation.id}")
+
+        self.assertTrue(own_history.data[0]["is_mine"])
 
     def test_non_member_cannot_send_message(self):
         # La validation du serializer bloque l'écriture hors du groupe.

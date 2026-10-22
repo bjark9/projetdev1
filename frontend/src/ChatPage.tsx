@@ -9,6 +9,17 @@ type ChatMessage = {
   content: string
   sender_username: string
   created_at: string
+  is_mine: boolean
+}
+
+type MessageHistoryItem = {
+  id: number
+  content: string
+  sender: {
+    username: string
+  }
+  created_at: string
+  is_mine: boolean
 }
 
 const backendUrl =
@@ -52,8 +63,16 @@ function ChatPage() {
         { headers: { Authorization: `Bearer ${token}` } },
       )
       if (historyResponse.ok) {
-        const history = (await historyResponse.json()) as ChatMessage[]
-        setMessages(history.reverse())
+        const history = (await historyResponse.json()) as MessageHistoryItem[]
+        setMessages(
+          history.reverse().map((item) => ({
+            message_id: item.id,
+            content: item.content,
+            sender_username: item.sender.username,
+            created_at: item.created_at,
+            is_mine: item.is_mine,
+          })),
+        )
       }
 
       // Puis on ouvre le WebSocket pour les nouveaux messages en direct.
@@ -102,7 +121,7 @@ function ChatPage() {
         <div className="chat-messages">
           {messages.map((chatMessage, index) => (
             <article
-              className="chat-message"
+              className={`chat-message${chatMessage.is_mine ? ' chat-message-own' : ''}`}
               key={`${chatMessage.message_id}-${index}`}
             >
               <strong>{chatMessage.sender_username}</strong>

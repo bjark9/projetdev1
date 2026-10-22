@@ -12,6 +12,7 @@ User = get_user_model()
 
 class MessageSerializer(serializers.ModelSerializer):
     sender = UserSerializer(read_only=True)
+    is_mine = serializers.SerializerMethodField()
 
     class Meta:
         model = Message
@@ -19,12 +20,17 @@ class MessageSerializer(serializers.ModelSerializer):
             "id",
             "conversation",
             "sender",
+            "is_mine",
             "content",
             "created_at",
             "edited_at",
             "read_by",
         ]
         read_only_fields = ["id", "sender", "created_at", "edited_at", "read_by"]
+
+    def get_is_mine(self, message):
+        request = self.context.get("request")
+        return request is not None and message.sender_id == request.user.pk
 
     def validate_conversation(self, conversation):
         # Cette validation protège aussi l'API HTTP, en plus du WebSocket.

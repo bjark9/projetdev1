@@ -19,6 +19,8 @@
 }
 
 .chat-messages {
+  display: flex;
+  flex-direction: column;
   min-height: 360px;
   padding: 24px;
 }
@@ -27,8 +29,23 @@
   margin-top: 18px;
 }
 
+.chat-message {
+  width: fit-content;
+  max-width: 80%;
+  padding: 12px 16px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: #fff;
+}
+
+.chat-message-own {
+  align-self: flex-end;
+  background: #dcefe9;
+}
+
 .chat-message p {
   margin: 4px 0 0;
+  overflow-wrap: anywhere;
 }
 
 .chat-composer {
