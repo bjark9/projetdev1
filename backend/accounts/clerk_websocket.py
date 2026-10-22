@@ -50,6 +50,7 @@ class ClerkWebSocketMiddleware:
 
     @staticmethod
     async def _get_user(token: str):
+        secret = os.environ.get("CLERK_SECRET_KEY")
         try:
             # La vérification utilise le même secret Clerk que l'auth HTTP.
             payload = await verify_token_async(
@@ -60,7 +61,10 @@ class ClerkWebSocketMiddleware:
                 ),
             )
         except TokenVerificationError as exc:
-            logger.warning("WS Clerk: token refusé: %s", exc)
+            logger.warning(
+            "WS Clerk: token refusé: %r | reason=%s | secret_set=%s | secret_prefix=%s",
+            exc, getattr(exc, "reason", None), bool(secret), (secret or "")[:7],
+        )
             return AnonymousUser()
 
         clerk_id = payload.get("sub")
