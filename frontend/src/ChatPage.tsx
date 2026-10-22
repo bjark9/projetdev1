@@ -1,7 +1,7 @@
 import { useAuth } from '@clerk/react'
 import { useEffect, useRef, useState } from 'react'
 import type { FormEvent } from 'react'
-import { useParams } from 'react-router-dom'
+import { Link, useParams } from 'react-router-dom'
 import './ChatPage.css'
 
 type ChatMessage = {
@@ -11,14 +11,18 @@ type ChatMessage = {
   created_at: string
 }
 
-const backendUrl = import.meta.env.VITE_BACKEND_URL ?? 'http://localhost:8000'
+const backendUrl =
+  import.meta.env.VITE_BACKEND_URL ??
+  (import.meta.env.PROD ? '' : 'http://localhost:8000')
 
 function websocketUrl(conversationId: string) {
-  // On réutilise l'URL backend pour fonctionner en local comme en production.
-  const url = new URL(`/ws/chat/${conversationId}/`, backendUrl)
-  url.protocol = url.protocol === 'https:' ? 'wss:' : 'ws:'
-  return url.toString()
+  const wsBase = backendUrl
+    ? backendUrl.replace(/^http/, 'ws')
+    : `${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}`
+
+  return `${wsBase}/api/ws/chat/${conversationId}/`   // plus de ?token=
 }
+
 
 function ChatPage() {
   const { conversationId } = useParams<{ conversationId: string }>()
@@ -53,10 +57,7 @@ function ChatPage() {
       }
 
       // Puis on ouvre le WebSocket pour les nouveaux messages en direct.
-      const socket = new WebSocket(websocketUrl(currentConversationId), [
-        'clerk',
-        token,
-      ])
+      const socket = new WebSocket(websocketUrl(currentConversationId), ['clerk', token])
       socketRef.current = socket
 
       socket.onopen = () => setStatus('Connecté')
@@ -94,7 +95,7 @@ function ChatPage() {
   return (
     <main className="chat-page">
       <header className="chat-header">
-        <a href="/conversation">Retour aux conversations</a>
+        <Link to="/conversation">Retour aux conversations</Link>
         <span>{status}</span>
       </header>
       <section className="chat-panel" aria-label="Conversation">

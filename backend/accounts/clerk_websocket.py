@@ -8,6 +8,9 @@ from django.contrib.auth.models import AnonymousUser
 
 from .models import User
 
+import logging # for debugging -> delete after maybe?
+logger = logging.getLogger(__name__)
+
 Scope = dict[str, Any]
 Receive = Callable[[], Awaitable[dict[str, Any]]]
 Send = Callable[[dict[str, Any]], Awaitable[None]]
@@ -26,6 +29,7 @@ class ClerkWebSocketMiddleware:
         # Sans sous-protocole Clerk, on conserve le mode local/session des tests.
         token = self._get_token(scope)
         if not token:
+            logger.warning("WS Clerk: pas de sous-protocole ['clerk', <token>]") # Token absent
             return await self.app(scope, receive, send)
 
         user = await self._get_user(token)
@@ -52,10 +56,11 @@ class ClerkWebSocketMiddleware:
                 token,
                 VerifyTokenOptions(
                     secret_key=os.environ.get("CLERK_SECRET_KEY"),
-                    authorized_parties=["http://localhost:5173"],
+                    authorized_parties=["http://localhost:5173", "https://projetdev1-dusky.vercel.app",],
                 ),
             )
-        except TokenVerificationError:
+        except TokenVerificationError as exc:
+            logger.warning("WS Clerk: token refusé: %s", exc)
             return AnonymousUser()
 
         clerk_id = payload.get("sub")

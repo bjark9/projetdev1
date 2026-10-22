@@ -1,4 +1,4 @@
-# Maps a URL pattern (ws/chat/<id>/) to that consumer.
+# Maps a URL pattern (api/ws/chat/<id>/) to that consumer.
 from django.urls import re_path
 
 from . import consumers
