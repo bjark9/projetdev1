@@ -1,4 +1,4 @@
-import { useAuth } from '@clerk/react'
+import { Show, UserButton, useAuth } from '@clerk/react'
 import { useEffect, useRef, useState } from 'react'
 import type { FormEvent } from 'react'
 import { Link, useParams } from 'react-router-dom'
@@ -116,6 +116,9 @@ function ChatPage() {
       <header className="chat-header">
         <Link to="/conversation">Retour aux conversations</Link>
         <span>{status}</span>
+        <Show when="signed-in">
+          <UserButton />
+        </Show>
       </header>
       <section className="chat-panel" aria-label="Conversation">
         <div className="chat-messages">

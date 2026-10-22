@@ -1,4 +1,4 @@
-import { useAuth } from '@clerk/react'
+import { Show, UserButton, useAuth } from '@clerk/react'
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import './App.css'
@@ -21,7 +21,7 @@ function ConversationPage() {
   const [error, setError] = useState('')
   const [groupName, setGroupName] = useState('')
   const [conversationName, setConversationName] = useState('')
-  const [memberId, setMemberId] = useState('')
+  const [memberIds, setMemberIds] = useState('')
   const [isCreating, setIsCreating] = useState(false)
 
   useEffect(() => {
@@ -59,16 +59,27 @@ function ConversationPage() {
   async function createConversation() {
     // Un groupe est créé avant la conversation qui lui est rattachée.
     const token = await getToken()
-    const parsedMemberId = Number(memberId)
+    const memberIdValues = memberIds
+      .split(',')
+      .map((memberId) => memberId.trim())
+      .filter(Boolean)
+    const parsedMemberIds = memberIdValues.map(Number)
 
     if (!token) {
       setError('Connexion Clerk nécessaire')
       return
     }
-    if (!groupName.trim() || !conversationName.trim() || !parsedMemberId) {
+    if (!groupName.trim() || !conversationName.trim() || !parsedMemberIds.length) {
       setError(
-        'Remplis le nom du groupe, le nom de la conversation et un ID membre',
+        'Remplis le nom du groupe, le nom de la conversation et au moins un ID membre',
       )
+      return
+    }
+    if (
+      memberIdValues.some((memberId) => !/^\d+$/.test(memberId)) ||
+      parsedMemberIds.some((memberId) => !Number.isSafeInteger(memberId) || memberId < 1)
+    ) {
+      setError('Les IDs des membres doivent être des nombres entiers positifs, séparés par des virgules')
       return
     }
 
@@ -84,7 +95,7 @@ function ConversationPage() {
         },
         body: JSON.stringify({
           name: groupName.trim(),
-          member_ids: [parsedMemberId],
+          member_ids: [...new Set(parsedMemberIds)],
         }),
       })
       if (!groupResponse.ok) {
@@ -118,7 +129,7 @@ function ConversationPage() {
       setConversations((current) => [conversation, ...current])
       setGroupName('')
       setConversationName('')
-      setMemberId('')
+      setMemberIds('')
     } catch (creationError) {
       setError(
         creationError instanceof Error
@@ -142,6 +153,9 @@ function ConversationPage() {
         <div className="nav-links">
           <a href="/">Home</a>
         </div>
+        <Show when="signed-in">
+          <UserButton />
+        </Show>
       </nav>
 
       <section className="conversation-section" id="top">
@@ -167,11 +181,11 @@ function ConversationPage() {
             placeholder="Nom du groupe"
           />
           <input
-            aria-label="ID du membre"
+            aria-label="IDs des membres"
             inputMode="numeric"
-            value={memberId}
-            onChange={(event) => setMemberId(event.target.value)}
-            placeholder="ID du deuxième membre"
+            value={memberIds}
+            onChange={(event) => setMemberIds(event.target.value)}
+            placeholder="IDs des membres (séparés par des virgules)"
           />
           <input
             aria-label="Nom de la conversation"
