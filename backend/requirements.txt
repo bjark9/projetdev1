@@ -1,6 +1,7 @@
 django
 djangorestframework
 channels
+channels_redis>=4.2,<5
 daphne
 dj-database-url
 psycopg2-binary

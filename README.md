@@ -94,6 +94,8 @@ Le fichier `.env.example` liste toutes les variables nécessaires. Copiez-le en 
 | --- | --- | --- |
 | [À COMPLÉTER] | [À COMPLÉTER] | [À COMPLÉTER] |
 
+Configure `REDIS_URL` in the deployed backend to point to a shared Redis instance. Django Channels uses Redis to deliver live chat messages between backend workers; without it, the in-memory layer is suitable only for local development and tests.
+
 ### Synchronisation des utilisateurs Clerk vers Neon
 
 Django utilise `DATABASE_URL` pour se connecter à Neon et `accounts.User` comme modèle utilisateur. Appliquez les migrations sur la base Neon après le déploiement (`python manage.py migrate`).

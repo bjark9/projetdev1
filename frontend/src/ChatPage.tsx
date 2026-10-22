@@ -1,7 +1,7 @@
 import { useAuth } from '@clerk/react'
 import { useEffect, useRef, useState } from 'react'
 import type { FormEvent } from 'react'
-import { useParams } from 'react-router-dom'
+import { Link, useParams } from 'react-router-dom'
 import './ChatPage.css'
 
 type ChatMessage = {
@@ -95,7 +95,7 @@ function ChatPage() {
   return (
     <main className="chat-page">
       <header className="chat-header">
-        <a href="/conversation">Retour aux conversations</a>
+        <Link to="/conversation">Retour aux conversations</Link>
         <span>{status}</span>
       </header>
       <section className="chat-panel" aria-label="Conversation">

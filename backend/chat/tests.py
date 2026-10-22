@@ -26,6 +26,18 @@ class ChatConsumerTests(TransactionTestCase):
         self.assertEqual(Message.objects.count(), 1)
         self.assertEqual(Message.objects.get().content, "Bonjour")
 
+    def test_message_is_broadcast_to_all_connected_members(self):
+        alice = User.objects.create_user(username="alice")
+        bob = User.objects.create_user(username="bob")
+        group = Group.objects.create(name="general")
+        Membership.objects.create(group=group, user=alice)
+        Membership.objects.create(group=group, user=bob)
+        conversation = Conversation.objects.create(group=group, name="general")
+
+        async_to_sync(self.check_broadcast_to_members)(conversation.id, alice, bob)
+
+        self.assertEqual(Message.objects.count(), 1)
+
     def test_non_member_cannot_connect(self):
         # Le groupe existe, mais l'utilisateur n'en est pas membre.
         user = User.objects.create_user(username="mallory", password="password")
@@ -49,7 +61,7 @@ class ChatConsumerTests(TransactionTestCase):
         # WebsocketCommunicator simule un navigateur connecté au consumer ASGI.
         communicator = WebsocketCommunicator(
             application,
-            f"/ws/chat/{conversation_id}/",
+            f"/api/ws/chat/{conversation_id}/",
         )
         cast(dict[str, object], communicator.scope)["user"] = user
 
@@ -65,10 +77,27 @@ class ChatConsumerTests(TransactionTestCase):
 
         await communicator.disconnect()
 
+    async def check_broadcast_to_members(self, conversation_id, alice, bob):
+        communicators = [WebsocketCommunicator(application, f"/api/ws/chat/{conversation_id}/") for _ in (alice, bob)]
+        for communicator, user in zip(communicators, (alice, bob), strict=True):
+            cast(dict[str, object], communicator.scope)["user"] = user
+            connected, _ = await communicator.connect()
+            self.assertTrue(connected)
+
+        await communicators[0].send_json_to({"content": "Bonjour"})
+        alice_message = await communicators[0].receive_json_from()
+        bob_message = await communicators[1].receive_json_from()
+
+        self.assertEqual(alice_message["content"], "Bonjour")
+        self.assertEqual(bob_message, alice_message)
+
+        await communicators[0].disconnect()
+        await communicators[1].disconnect()
+
     async def check_rejected_websocket(self, conversation_id, user):
         communicator = WebsocketCommunicator(
             application,
-            f"/ws/chat/{conversation_id}/",
+            f"/api/ws/chat/{conversation_id}/",
         )
         cast(dict[str, object], communicator.scope)["user"] = user
 
@@ -78,7 +107,7 @@ class ChatConsumerTests(TransactionTestCase):
     async def check_empty_message(self, conversation_id, user):
         communicator = WebsocketCommunicator(
             application,
-            f"/ws/chat/{conversation_id}/",
+            f"/api/ws/chat/{conversation_id}/",
         )
         cast(dict[str, object], communicator.scope)["user"] = user
 
