@@ -21,6 +21,9 @@ class ChatConsumerTests(TransactionTestCase):
         Membership.objects.create(group=group, user=user)
         conversation = Conversation.objects.create(group=group, name="general")
 
+        user.first_name = "Alice"
+        user.last_name = "Martin"
+        user.save(update_fields=["first_name", "last_name"])
         async_to_sync(self.check_websocket)(conversation.id, user)
 
         self.assertEqual(Message.objects.count(), 1)
@@ -74,6 +77,7 @@ class ChatConsumerTests(TransactionTestCase):
 
         self.assertEqual(response["content"], "Bonjour")
         self.assertEqual(response["sender_username"], "alice")
+        self.assertEqual(response["sender_display_name"], "Alice Martin")
         self.assertTrue(response["is_mine"])
 
         await communicator.disconnect()
@@ -93,6 +97,7 @@ class ChatConsumerTests(TransactionTestCase):
         self.assertTrue(alice_message["is_mine"])
         self.assertFalse(bob_message["is_mine"])
         self.assertEqual(bob_message["sender_username"], "alice")
+        self.assertEqual(bob_message["sender_display_name"], "alice")
 
         await communicators[0].disconnect()
         await communicators[1].disconnect()
@@ -221,12 +226,28 @@ class GroupApiTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.data[0]["id"], message.id)
         self.assertEqual(response.data[0]["sender"]["username"], "alice")
+        self.assertEqual(response.data[0]["sender"]["display_name"], "alice")
         self.assertFalse(response.data[0]["is_mine"])
 
         self.api_client.force_authenticate(user=self.alice)
         own_history = self.api_client.get(f"/api/messages/?conversation={conversation.id}")
 
         self.assertTrue(own_history.data[0]["is_mine"])
+
+    def test_message_history_uses_first_and_last_name_when_available(self):
+        self.alice.first_name = "Alice"
+        self.alice.last_name = "Martin"
+        self.alice.save(update_fields=["first_name", "last_name"])
+        group = Group.objects.create(name="Equipe de projet")
+        Membership.objects.create(group=group, user=self.alice)
+        Membership.objects.create(group=group, user=self.bob)
+        conversation = Conversation.objects.create(group=group, name="General")
+        Message.objects.create(conversation=conversation, sender=self.alice, content="Bonjour")
+
+        self.api_client.force_authenticate(user=self.bob)
+        response = self.api_client.get(f"/api/messages/?conversation={conversation.id}")
+
+        self.assertEqual(response.data[0]["sender"]["display_name"], "Alice Martin")
 
     def test_non_member_cannot_send_message(self):
         # La validation du serializer bloque l'écriture hors du groupe.

@@ -5,7 +5,12 @@ from .models import User
 
 
 class UserSerializer(serializers.ModelSerializer):
+    display_name = serializers.SerializerMethodField()
+
     class Meta:
         model = User
-        fields = ["id", "username", "is_online", "last_seen"]
-        read_only_fields = ["id", "is_online", "last_seen"]
+        fields = ["id", "username", "display_name", "is_online", "last_seen"]
+        read_only_fields = ["id", "display_name", "is_online", "last_seen"]
+
+    def get_display_name(self, user):
+        return user.get_full_name().strip() or user.get_username()

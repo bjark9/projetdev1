@@ -9,7 +9,7 @@ import './ChatPage.css'
 type ChatMessage = {
   message_id: number
   content: string
-  sender_username: string
+  sender_display_name: string
   created_at: string
   is_mine: boolean
 }
@@ -19,6 +19,7 @@ type MessageHistoryItem = {
   content: string
   sender: {
     username: string
+    display_name: string
   }
   created_at: string
   is_mine: boolean
@@ -86,7 +87,8 @@ function ChatPage() {
           history.reverse().map((item) => ({
             message_id: item.id,
             content: item.content,
-            sender_username: item.sender.username,
+            sender_display_name:
+              item.sender.display_name.trim() || item.sender.username,
             created_at: item.created_at,
             is_mine: item.is_mine,
           })),
@@ -149,7 +151,7 @@ function ChatPage() {
                 className={`chat-message${chatMessage.is_mine ? ' chat-message-own' : ''}`}
                 key={`${chatMessage.message_id}-${index}`}
               >
-                <strong>{chatMessage.sender_username}</strong>
+                <strong>{chatMessage.sender_display_name}</strong>
                 <p>{chatMessage.content}</p>
               </article>
             ))}

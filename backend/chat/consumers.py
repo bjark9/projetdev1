@@ -84,6 +84,7 @@ class ChatConsumer(AsyncWebsocketConsumer):
                 "content": message.content,
                 "sender_id": self.user.id,
                 "sender_username": self.user.username,
+                "sender_display_name": self.user.get_full_name().strip() or self.user.get_username(),
                 "created_at": message.created_at.isoformat(),
             },
         )
@@ -97,6 +98,7 @@ class ChatConsumer(AsyncWebsocketConsumer):
                     "content": event["content"],
                     "sender_id": event["sender_id"],
                     "sender_username": event["sender_username"],
+                    "sender_display_name": event["sender_display_name"],
                     "is_mine": event["sender_id"] == self.user.id,
                     "created_at": event["created_at"],
                 }
