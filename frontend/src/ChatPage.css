@@ -18,6 +18,97 @@
   flex-shrink: 0;
 }
 
+.chat-members-panel {
+  width: 100%;
+  max-width: 760px;
+  margin: 20px auto 0;
+  padding: 20px;
+  border: 1px solid var(--border);
+  background: var(--bg);
+}
+
+.chat-members-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.chat-members-heading h2 {
+  margin: 0;
+}
+
+.chat-members-heading p {
+  color: #68706f;
+  font-size: 14px;
+}
+
+.chat-members-error {
+  margin-top: 10px;
+  color: #a52b21;
+  font-size: 14px;
+}
+
+.chat-add-member {
+  display: grid;
+  gap: 8px;
+  margin-top: 16px;
+}
+
+.chat-add-member label {
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.chat-add-member > div {
+  display: flex;
+  gap: 8px;
+}
+
+.chat-add-member input {
+  flex: 1;
+  min-width: 0;
+  padding: 8px;
+}
+
+.chat-add-member button,
+.chat-remove-member,
+.chat-members-list select {
+  padding: 7px 10px;
+}
+
+.chat-members-list {
+  display: grid;
+  gap: 8px;
+  margin: 16px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.chat-members-list li {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  padding-top: 8px;
+  border-top: 1px solid var(--border);
+}
+
+.chat-member-role {
+  color: #68706f;
+  font-size: 13px;
+}
+
+.chat-members-list select,
+.chat-remove-member {
+  margin-left: auto;
+}
+
+.chat-remove-member {
+  border: 1px solid var(--border);
+  background: transparent;
+  cursor: pointer;
+}
+
 .chat-panel {
   display: flex;
   flex: 1;
@@ -70,6 +161,10 @@
 
 @media (max-width: 600px) {
   .chat-page {
+    padding: 16px;
+  }
+
+  .chat-members-panel {
     padding: 16px;
   }
 

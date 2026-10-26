@@ -42,12 +42,37 @@ class MessageSerializer(serializers.ModelSerializer):
 
 
 class GroupSerializer(serializers.ModelSerializer):
-    members = UserSerializer(many=True, read_only=True)
+    members = serializers.SerializerMethodField()
+    current_user_role = serializers.SerializerMethodField()
 
     class Meta:
         model = Group
-        fields = ["id", "name", "members", "created_at"]
+        fields = ["id", "name", "members", "current_user_role", "created_at"]
         read_only_fields = ["id", "members", "created_at"]
+
+    def get_members(self, group):
+        memberships = group.memberships.all()
+        return [
+            {
+                "user": UserSerializer(membership.user, context=self.context).data,
+                "role": membership.role,
+                "joined_at": membership.joined_at,
+            }
+            for membership in memberships
+        ]
+
+    def get_current_user_role(self, group):
+        request = self.context.get("request")
+        if request is None or not request.user.is_authenticated:
+            return None
+        return next(
+            (
+                membership.role
+                for membership in group.memberships.all()
+                if membership.user_id == request.user.pk
+            ),
+            None,
+        )
 
 
 class GroupCreateSerializer(serializers.ModelSerializer):
@@ -79,7 +104,17 @@ class GroupCreateSerializer(serializers.ModelSerializer):
         users = validated_data.pop("member_ids")
         with transaction.atomic():
             group = Group.objects.create(**validated_data)
-            Membership.objects.bulk_create([Membership(group=group, user=u) for u in users])
+            creator = self.context["request"].user
+            Membership.objects.bulk_create(
+                [
+                    Membership(
+                        group=group,
+                        user=user,
+                        role=Membership.Role.OWNER if user.pk == creator.pk else Membership.Role.MEMBER,
+                    )
+                    for user in users
+                ]
+            )
         return group
 
     def to_representation(self, instance):

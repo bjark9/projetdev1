@@ -145,6 +145,14 @@ class GroupApiTests(TestCase):
         self.assertEqual(response.status_code, 201)
         self.assertEqual(Group.objects.count(), 1)
         self.assertEqual(Membership.objects.count(), 2)
+        self.assertEqual(
+            Membership.objects.get(group_id=response.data["id"], user=self.alice).role,
+            Membership.Role.OWNER,
+        )
+        self.assertEqual(
+            Membership.objects.get(group_id=response.data["id"], user=self.bob).role,
+            Membership.Role.MEMBER,
+        )
 
     def test_member_can_list_his_groups(self):
         group = Group.objects.create(name="Equipe de projet")
@@ -236,9 +244,9 @@ class GroupApiTests(TestCase):
         self.assertEqual(response.status_code, 400)
         self.assertEqual(Message.objects.count(), 0)
 
-    def test_member_can_add_another_member(self):
+    def test_owner_can_add_another_member(self):
         group = Group.objects.create(name="Equipe de projet")
-        Membership.objects.create(group=group, user=self.alice)
+        Membership.objects.create(group=group, user=self.alice, role=Membership.Role.OWNER)
 
         self.api_client.force_authenticate(user=self.alice)
         response = self.api_client.post(
@@ -249,10 +257,15 @@ class GroupApiTests(TestCase):
 
         self.assertEqual(response.status_code, 201)
         self.assertTrue(Membership.objects.filter(group=group, user=self.bob).exists())
+        self.assertEqual(response.data["current_user_role"], Membership.Role.OWNER)
+        self.assertEqual(
+            next(member["role"] for member in response.data["members"] if member["user"]["id"] == self.bob.id),
+            Membership.Role.MEMBER,
+        )
 
-    def test_member_can_remove_a_member(self):
+    def test_owner_can_remove_a_member(self):
         group = Group.objects.create(name="Equipe de projet")
-        Membership.objects.create(group=group, user=self.alice)
+        Membership.objects.create(group=group, user=self.alice, role=Membership.Role.OWNER)
         Membership.objects.create(group=group, user=self.bob)
 
         self.api_client.force_authenticate(user=self.alice)
@@ -260,6 +273,79 @@ class GroupApiTests(TestCase):
 
         self.assertEqual(response.status_code, 204)
         self.assertFalse(Membership.objects.filter(group=group, user=self.bob).exists())
+
+    def test_regular_member_cannot_manage_members(self):
+        group = Group.objects.create(name="Equipe de projet")
+        Membership.objects.create(group=group, user=self.alice, role=Membership.Role.OWNER)
+        Membership.objects.create(group=group, user=self.bob, role=Membership.Role.MEMBER)
+        charlie = User.objects.create_user(username="charlie")
+
+        self.api_client.force_authenticate(user=self.bob)
+        response = self.api_client.post(
+            f"/api/groups/{group.id}/members/",
+            {"user_id": charlie.id},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 403)
+        self.assertFalse(Membership.objects.filter(group=group, user=charlie).exists())
+
+    def test_admin_can_add_and_remove_members_but_not_admins(self):
+        group = Group.objects.create(name="Equipe de projet")
+        Membership.objects.create(group=group, user=self.alice, role=Membership.Role.OWNER)
+        Membership.objects.create(group=group, user=self.bob, role=Membership.Role.ADMIN)
+        charlie = User.objects.create_user(username="charlie")
+        dave = User.objects.create_user(username="dave")
+        Membership.objects.create(group=group, user=dave, role=Membership.Role.ADMIN)
+
+        self.api_client.force_authenticate(user=self.bob)
+        add_response = self.api_client.post(
+            f"/api/groups/{group.id}/members/",
+            {"user_id": charlie.id},
+            format="json",
+        )
+        self.assertEqual(add_response.status_code, 201)
+
+        remove_member_response = self.api_client.delete(
+            f"/api/groups/{group.id}/members/{charlie.id}/"
+        )
+        self.assertEqual(remove_member_response.status_code, 204)
+
+        remove_admin_response = self.api_client.delete(
+            f"/api/groups/{group.id}/members/{dave.id}/"
+        )
+        self.assertEqual(remove_admin_response.status_code, 403)
+        remove_owner_response = self.api_client.delete(
+            f"/api/groups/{group.id}/members/{self.alice.id}/"
+        )
+        self.assertEqual(remove_owner_response.status_code, 400)
+        self.assertTrue(Membership.objects.filter(group=group, user=self.alice).exists())
+        self.assertTrue(Membership.objects.filter(group=group, user=dave).exists())
+
+    def test_only_owner_can_change_member_role(self):
+        group = Group.objects.create(name="Equipe de projet")
+        Membership.objects.create(group=group, user=self.alice, role=Membership.Role.OWNER)
+        Membership.objects.create(group=group, user=self.bob, role=Membership.Role.MEMBER)
+
+        self.api_client.force_authenticate(user=self.bob)
+        forbidden = self.api_client.patch(
+            f"/api/groups/{group.id}/members/{self.bob.id}/role/",
+            {"role": Membership.Role.ADMIN},
+            format="json",
+        )
+        self.assertEqual(forbidden.status_code, 403)
+
+        self.api_client.force_authenticate(user=self.alice)
+        response = self.api_client.patch(
+            f"/api/groups/{group.id}/members/{self.bob.id}/role/",
+            {"role": Membership.Role.ADMIN},
+            format="json",
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(
+            Membership.objects.get(group=group, user=self.bob).role,
+            Membership.Role.ADMIN,
+        )
 
     def test_non_member_cannot_manage_group_members(self):
         group = Group.objects.create(name="Equipe de projet")
