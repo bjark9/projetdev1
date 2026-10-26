@@ -125,6 +125,7 @@ class GroupCreateSerializer(serializers.ModelSerializer):
 class ConversationSerializer(serializers.ModelSerializer):
     group = GroupSerializer(read_only=True)
     last_message = serializers.SerializerMethodField()
+    unread_count = serializers.SerializerMethodField()
 
     class Meta:
         model = Conversation
@@ -135,12 +136,19 @@ class ConversationSerializer(serializers.ModelSerializer):
             "created_at",
             "updated_at",
             "last_message",
+            "unread_count",
         ]
         read_only_fields = ["id", "created_at", "updated_at"]
 
     def get_last_message(self, obj):
         last = obj.messages.order_by("-created_at").first()
         return MessageSerializer(last, context=self.context).data if last else None
+
+    def get_unread_count(self, obj):
+        request = self.context.get("request")
+        if request is None or not request.user.is_authenticated:
+            return 0
+        return obj.messages.exclude(sender=request.user).exclude(read_by=request.user).count()
 
 
 class ConversationCreateSerializer(serializers.ModelSerializer):

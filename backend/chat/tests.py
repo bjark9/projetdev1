@@ -89,18 +89,26 @@ class ChatConsumerTests(TransactionTestCase):
             connected, _ = await communicator.connect()
             self.assertTrue(connected)
 
+        notifications = WebsocketCommunicator(application, "/api/ws/notifications/")
+        cast(dict[str, object], notifications.scope)["user"] = bob
+        notifications_connected, _ = await notifications.connect()
+        self.assertTrue(notifications_connected)
+
         await communicators[0].send_json_to({"content": "Bonjour"})
         alice_message = await communicators[0].receive_json_from()
         bob_message = await communicators[1].receive_json_from()
+        notification = await notifications.receive_json_from()
 
         self.assertEqual(alice_message["content"], "Bonjour")
         self.assertTrue(alice_message["is_mine"])
         self.assertFalse(bob_message["is_mine"])
         self.assertEqual(bob_message["sender_username"], "alice")
         self.assertEqual(bob_message["sender_display_name"], "alice")
+        self.assertEqual(notification["conversation_id"], conversation_id)
 
         await communicators[0].disconnect()
         await communicators[1].disconnect()
+        await notifications.disconnect()
 
     async def check_rejected_websocket(self, conversation_id, user):
         communicator = WebsocketCommunicator(
@@ -248,6 +256,42 @@ class GroupApiTests(TestCase):
         response = self.api_client.get(f"/api/messages/?conversation={conversation.id}")
 
         self.assertEqual(response.data[0]["sender"]["display_name"], "Alice Martin")
+
+    def test_conversation_includes_unread_count_and_mark_read_clears_it(self):
+        group = Group.objects.create(name="Equipe de projet")
+        Membership.objects.create(group=group, user=self.alice)
+        Membership.objects.create(group=group, user=self.bob)
+        conversation = Conversation.objects.create(group=group, name="General")
+        Message.objects.create(conversation=conversation, sender=self.alice, content="Bonjour")
+
+        self.api_client.force_authenticate(user=self.bob)
+        conversation_response = self.api_client.get(f"/api/conversations/{conversation.id}/")
+        self.assertEqual(conversation_response.data["unread_count"], 1)
+
+        mark_read_response = self.api_client.post(
+            "/api/messages/mark-read/",
+            {"conversation": conversation.id},
+            format="json",
+        )
+        self.assertEqual(mark_read_response.status_code, 200)
+        self.assertEqual(mark_read_response.data["marked_read"], 1)
+
+        refreshed_conversation = self.api_client.get(f"/api/conversations/{conversation.id}/")
+        self.assertEqual(refreshed_conversation.data["unread_count"], 0)
+
+    def test_member_cannot_mark_non_member_conversation_as_read(self):
+        group = Group.objects.create(name="Equipe de projet")
+        Membership.objects.create(group=group, user=self.alice)
+        conversation = Conversation.objects.create(group=group, name="General")
+
+        self.api_client.force_authenticate(user=self.bob)
+        response = self.api_client.post(
+            "/api/messages/mark-read/",
+            {"conversation": conversation.id},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 404)
 
     def test_non_member_cannot_send_message(self):
         # La validation du serializer bloque l'écriture hors du groupe.

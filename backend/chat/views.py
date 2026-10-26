@@ -3,6 +3,7 @@
 # C'est elle qui reçoit la requête HTTP, vérifie l'authentification et les permissions, 
 # choisit quelles données récupérer (le queryset), 
 # puis fait appel au serializer pour fabriquer la réponse.
+from asgiref.sync import async_to_sync
 from rest_framework import mixins, permissions, viewsets
 # La vue est le point d'entrée.
 # C'est elle qui reçoit la requête HTTP, vérifie l'authentification et les permissions,
@@ -16,6 +17,7 @@ from rest_framework.exceptions import PermissionDenied
 from rest_framework.response import Response
 
 from .models import Conversation, Group, Membership, Message
+from .events import broadcast_message
 from .serializers import (
     ConversationCreateSerializer,
     ConversationSerializer,
@@ -153,6 +155,28 @@ class MessageViewSet(
     serializer_class = MessageSerializer
     permission_classes = [permissions.IsAuthenticated]
 
+    @action(detail=False, methods=["post"], url_path="mark-read")
+    def mark_read(self, request):
+        conversation_id = request.data.get("conversation")
+        if not conversation_id:
+            return Response(
+                {"conversation": "This field is required."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        conversation = get_object_or_404(
+            Conversation.objects.filter(group__memberships__user=request.user),
+            pk=conversation_id,
+        )
+        unread_messages = conversation.messages.exclude(sender=request.user).exclude(read_by=request.user)
+        message_ids = list(unread_messages.values_list("pk", flat=True))
+        read_memberships = [
+            Message.read_by.through(message_id=message_id, user_id=request.user.pk)
+            for message_id in message_ids
+        ]
+        Message.read_by.through.objects.bulk_create(read_memberships, ignore_conflicts=True)
+        return Response({"marked_read": len(message_ids)}, status=status.HTTP_200_OK)
+
     def get_queryset(self):
         # L'historique est limité aux conversations des groupes de l'utilisateur.
         qs = (  # Récupère les messages des conversations auxquelles l'utilisateur appartient
@@ -176,4 +200,4 @@ class MessageViewSet(
         # (only needed if updated_at is auto_now)
         message.conversation.save(update_fields=["updated_at"])
 
-        # TODO (step 2): broadcast `message` to the channel group of the conversation
+        async_to_sync(broadcast_message)(message)

@@ -142,6 +142,13 @@
   overflow-y: auto;
 }
 
+.chat-read-error {
+  flex-shrink: 0;
+  padding: 10px 16px;
+  color: #a52b21;
+  font-size: 14px;
+}
+
 .chat-message + .chat-message {
   margin-top: 18px;
 }

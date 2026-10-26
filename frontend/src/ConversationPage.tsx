@@ -7,12 +7,23 @@ type Conversation = {
   id: number
   name: string
   updated_at: string
+  unread_count: number
   group: {
     members: unknown[]
   }
 }
 
-const backendUrl = import.meta.env.VITE_BACKEND_URL ?? 'http://localhost:8000'
+const backendUrl =
+  import.meta.env.VITE_BACKEND_URL ??
+  (import.meta.env.PROD ? '' : 'http://localhost:8000')
+
+function notificationWebsocketUrl() {
+  const wsBase = backendUrl
+    ? backendUrl.replace(/^http/, 'ws')
+    : `${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}`
+
+  return `${wsBase}/api/ws/notifications/`
+}
 
 function ConversationPage() {
   const navigate = useNavigate()
@@ -23,6 +34,7 @@ function ConversationPage() {
   const [conversationName, setConversationName] = useState('')
   const [memberIds, setMemberIds] = useState('')
   const [isCreating, setIsCreating] = useState(false)
+  const conversationIds = conversations.map(({ id }) => id).join(',')
 
   useEffect(() => {
     if (!isLoaded || !isSignedIn) return
@@ -51,6 +63,42 @@ function ConversationPage() {
 
     void loadConversations()
   }, [getToken, isLoaded, isSignedIn])
+
+  useEffect(() => {
+    if (!isLoaded || !isSignedIn || !conversationIds) return
+
+    let isCancelled = false
+    const sockets: WebSocket[] = []
+
+    async function subscribeToMessages() {
+      const token = await getToken()
+      if (!token || isCancelled) return
+
+      const socket = new WebSocket(notificationWebsocketUrl(), ['clerk', token])
+      sockets.push(socket)
+      socket.onmessage = (event) => {
+        const notification = JSON.parse(event.data) as {
+          conversation_id: number
+        }
+        setConversations((current) =>
+          current.map((item) =>
+            item.id === notification.conversation_id
+              ? { ...item, unread_count: item.unread_count + 1 }
+              : item,
+          ),
+        )
+      }
+      socket.onerror = () => {
+        setError('Les notifications temps réel sont momentanément indisponibles.')
+      }
+    }
+
+    void subscribeToMessages()
+    return () => {
+      isCancelled = true
+      sockets.forEach((socket) => socket.close())
+    }
+  }, [conversationIds, getToken, isLoaded, isSignedIn])
 
   function enterConversation(conversationId: number) {
     navigate(`/conversation/${conversationId}`)
@@ -210,7 +258,16 @@ function ConversationPage() {
                 onClick={() => enterConversation(conversation.id)}
               >
                 <div className="conversation-row-main">
-                  <span className="conversation-status" />
+                  {conversation.unread_count > 0 ? (
+                    <span
+                      className="conversation-unread-indicator"
+                      aria-label={`${conversation.unread_count} message${conversation.unread_count === 1 ? '' : 's'} non lu${conversation.unread_count === 1 ? '' : 's'}`}
+                    >
+                      {conversation.unread_count}
+                    </span>
+                  ) : (
+                    <span className="conversation-status" />
+                  )}
                   <span className="conversation-row-name">
                     {conversation.name}
                   </span>

@@ -325,6 +325,22 @@ h2 em {
   margin-right: 9px;
   width: 8px;
 }
+
+.conversation-unread-indicator {
+  align-items: center;
+  background: var(--coral);
+  border-radius: 999px;
+  color: #fff;
+  display: inline-flex;
+  font-family: var(--mono);
+  font-size: 10px;
+  font-weight: 700;
+  height: 20px;
+  justify-content: center;
+  margin-right: 9px;
+  min-width: 20px;
+  padding: 0 5px;
+}
 .icon-button {
   background: none;
   border: 0;

@@ -51,6 +51,7 @@ function ChatPage() {
   const [message, setMessage] = useState('')
   const [status, setStatus] = useState('Connexion...')
   const [conversation, setConversation] = useState<ConversationDetails | null>(null)
+  const [readError, setReadError] = useState('')
 
   useEffect(() => {
     if (!conversationId || !isLoaded || !isSignedIn) return
@@ -99,6 +100,31 @@ function ChatPage() {
       }
 
       if (isCancelled) return
+      async function markMessagesRead() {
+        const response = await fetch(`${backendUrl}/api/messages/mark-read/`, {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ conversation: currentConversationId }),
+        })
+        if (!response.ok) {
+          throw new Error('Impossible de mettre à jour les messages non lus.')
+        }
+      }
+
+      try {
+        await markMessagesRead()
+      } catch (error) {
+        setReadError(
+          error instanceof Error
+            ? error.message
+            : 'Impossible de mettre à jour les messages non lus.',
+        )
+      }
+
+      if (isCancelled) return
       const socket = new WebSocket(websocketUrl(currentConversationId), [
         'clerk',
         token,
@@ -109,6 +135,15 @@ function ChatPage() {
       socket.onmessage = (event) => {
         const incomingMessage = JSON.parse(event.data) as ChatMessage
         setMessages((currentMessages) => [...currentMessages, incomingMessage])
+        if (!incomingMessage.is_mine) {
+          void markMessagesRead().catch((error: unknown) => {
+            setReadError(
+              error instanceof Error
+                ? error.message
+                : 'Impossible de mettre à jour les messages non lus.',
+            )
+          })
+        }
       }
       socket.onerror = () => setStatus('Erreur de connexion')
       socket.onclose = () => setStatus('Déconnecté')
@@ -145,6 +180,11 @@ function ChatPage() {
       </header>
       <div className="chat-content">
         <section className="chat-panel" aria-label="Conversation">
+          {readError && (
+            <p className="chat-read-error" role="alert">
+              {readError}
+            </p>
+          )}
           <div className="chat-messages">
             {messages.map((chatMessage, index) => (
               <article
