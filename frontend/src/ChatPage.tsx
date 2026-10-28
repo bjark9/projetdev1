@@ -14,6 +14,19 @@ type ChatMessage = {
   is_mine: boolean
 }
 
+type ChatMessageDeletedEvent = {
+  type: 'message_deleted'
+  message_id: number
+}
+
+type ChatMessageEvent = ChatMessage | ChatMessageDeletedEvent
+
+function isMessageDeletedEvent(
+  event: ChatMessageEvent,
+): event is ChatMessageDeletedEvent {
+  return 'type' in event && event.type === 'message_deleted'
+}
+
 type MessageHistoryItem = {
   id: number
   content: string
@@ -52,6 +65,8 @@ function ChatPage() {
   const [status, setStatus] = useState('Connexion...')
   const [conversation, setConversation] = useState<ConversationDetails | null>(null)
   const [readError, setReadError] = useState('')
+  const [messageError, setMessageError] = useState('')
+  const [deletingMessageId, setDeletingMessageId] = useState<number | null>(null)
 
   useEffect(() => {
     if (!conversationId || !isLoaded || !isSignedIn) return
@@ -133,7 +148,17 @@ function ChatPage() {
 
       socket.onopen = () => setStatus('Connecté')
       socket.onmessage = (event) => {
-        const incomingMessage = JSON.parse(event.data) as ChatMessage
+        const incomingMessage = JSON.parse(event.data) as ChatMessageEvent
+        if (isMessageDeletedEvent(incomingMessage)) {
+          setMessages((currentMessages) =>
+            currentMessages.filter(
+              (currentMessage) =>
+                currentMessage.message_id !== incomingMessage.message_id,
+            ),
+          )
+          return
+        }
+
         setMessages((currentMessages) => [...currentMessages, incomingMessage])
         if (!incomingMessage.is_mine) {
           void markMessagesRead().catch((error: unknown) => {
@@ -167,6 +192,36 @@ function ChatPage() {
     setMessage('')
   }
 
+  async function deleteMessage(messageId: number) {
+    setMessageError('')
+    setDeletingMessageId(messageId)
+
+    try {
+      const token = await getToken()
+      if (!token) throw new Error('Connexion Clerk nécessaire')
+
+      const response = await fetch(`${backendUrl}/api/messages/${messageId}/`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${token}` },
+      })
+      if (!response.ok) {
+        throw new Error('Impossible de supprimer le message.')
+      }
+
+      setMessages((currentMessages) =>
+        currentMessages.filter(
+          (currentMessage) => currentMessage.message_id !== messageId,
+        ),
+      )
+    } catch (error) {
+      setMessageError(
+        error instanceof Error ? error.message : 'Impossible de supprimer le message.',
+      )
+    } finally {
+      setDeletingMessageId(null)
+    }
+  }
+
   if (!conversationId) return <p>Conversation introuvable.</p>
 
   return (
@@ -185,6 +240,11 @@ function ChatPage() {
               {readError}
             </p>
           )}
+          {messageError && (
+            <p className="chat-read-error" role="alert">
+              {messageError}
+            </p>
+          )}
           <div className="chat-messages">
             {messages.map((chatMessage, index) => (
               <article
@@ -193,6 +253,18 @@ function ChatPage() {
               >
                 <strong>{chatMessage.sender_display_name}</strong>
                 <p>{chatMessage.content}</p>
+                {chatMessage.is_mine && (
+                  <button
+                    className="chat-delete-message"
+                    type="button"
+                    disabled={deletingMessageId !== null}
+                    onClick={() => void deleteMessage(chatMessage.message_id)}
+                  >
+                    {deletingMessageId === chatMessage.message_id
+                      ? 'Suppression...'
+                      : 'Supprimer'}
+                  </button>
+                )}
               </article>
             ))}
           </div>

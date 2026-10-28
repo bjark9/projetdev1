@@ -36,6 +36,20 @@ async def broadcast_message(message: Message) -> None:
             )
 
 
+async def broadcast_message_deleted(message_id: int, conversation_id: int) -> None:
+    channel_layer = get_channel_layer()
+    if channel_layer is None:
+        raise RuntimeError("No channel layer is configured.")
+
+    await channel_layer.group_send(
+        f"chat_{conversation_id}",
+        {
+            "type": "chat_message_deleted",
+            "message_id": message_id,
+        },
+    )
+
+
 @database_sync_to_async
 def conversation_member_ids(conversation_id: int) -> list[int]:
     return list(

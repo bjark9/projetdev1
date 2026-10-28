@@ -4,11 +4,6 @@
 # choisit quelles données récupérer (le queryset), 
 # puis fait appel au serializer pour fabriquer la réponse.
 from asgiref.sync import async_to_sync
-from rest_framework import mixins, permissions, viewsets
-# La vue est le point d'entrée.
-# C'est elle qui reçoit la requête HTTP, vérifie l'authentification et les permissions,
-# choisit quelles données récupérer (le queryset),
-# puis fait appel au serializer pour fabriquer la réponse.
 from django.contrib.auth import get_user_model
 from django.shortcuts import get_object_or_404
 from rest_framework import mixins, permissions, status, viewsets
@@ -16,8 +11,8 @@ from rest_framework.decorators import action
 from rest_framework.exceptions import PermissionDenied
 from rest_framework.response import Response
 
+from .events import broadcast_message, broadcast_message_deleted
 from .models import Conversation, Group, Membership, Message
-from .events import broadcast_message
 from .serializers import (
     ConversationCreateSerializer,
     ConversationSerializer,
@@ -145,11 +140,13 @@ class ConversationViewSet(
 class MessageViewSet(
     mixins.ListModelMixin,
     mixins.CreateModelMixin,
+    mixins.DestroyModelMixin,
     viewsets.GenericViewSet,
 ):
     """
     GET  /api/messages/?conversation=<id>  -> messages of a conversation
     POST /api/messages/                    -> {"conversation": <id>, "content": "..."}
+    DELETE /api/messages/<id>/             -> delete a message authored by the user
     """
 
     serializer_class = MessageSerializer
@@ -201,3 +198,12 @@ class MessageViewSet(
         message.conversation.save(update_fields=["updated_at"])
 
         async_to_sync(broadcast_message)(message)
+
+    def perform_destroy(self, instance):
+        if instance.sender_id != self.request.user.pk:
+            raise PermissionDenied("You can only delete your own messages.")
+
+        message_id = instance.pk
+        conversation_id = instance.conversation_id
+        instance.delete()
+        async_to_sync(broadcast_message_deleted)(message_id, conversation_id)

@@ -192,7 +192,7 @@ function ConversationPage() {
   return (
     <main>
       <nav className="nav-shell" aria-label="Main navigation">
-        <a className="brand" href="#top" aria-label="Relay home">
+        <a className="brand" href="/" aria-label="Relay home">
           <span className="brand-mark" aria-hidden="true">
             <span />
           </span>

@@ -94,6 +94,16 @@ class ChatConsumer(AsyncWebsocketConsumer):
             )
         )
 
+    async def chat_message_deleted(self, event: dict[str, Any]) -> None:
+        await self.send(
+            text_data=json.dumps(
+                {
+                    "type": "message_deleted",
+                    "message_id": event["message_id"],
+                }
+            )
+        )
+
     @database_sync_to_async
     def is_conversation_participant(self):
         # L'accès dépend du groupe lié à la conversation.

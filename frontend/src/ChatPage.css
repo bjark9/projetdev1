@@ -172,6 +172,19 @@
   overflow-wrap: anywhere;
 }
 
+.chat-delete-message {
+  margin-top: 8px;
+  padding: 4px 8px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: transparent;
+  cursor: pointer;
+}
+
+.chat-delete-message:disabled {
+  cursor: wait;
+}
+
 .chat-composer {
   flex-shrink: 0;
   padding: 16px;
