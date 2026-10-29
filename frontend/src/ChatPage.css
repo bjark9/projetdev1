@@ -172,8 +172,22 @@
   overflow-wrap: anywhere;
 }
 
-.chat-delete-message {
+.chat-message-edited {
+  display: block;
+  margin-top: 4px;
+  color: #68706f;
+  font-size: 12px;
+}
+
+.chat-message-actions {
+  position: relative;
+  display: flex;
+  justify-content: flex-end;
   margin-top: 8px;
+}
+
+.chat-message-menu-button,
+.chat-message-menu button {
   padding: 4px 8px;
   border: 1px solid var(--border);
   border-radius: 6px;
@@ -181,8 +195,45 @@
   cursor: pointer;
 }
 
-.chat-delete-message:disabled {
+.chat-message-menu-button:disabled,
+.chat-message-menu button:disabled {
   cursor: wait;
+}
+
+.chat-message-menu {
+  position: absolute;
+  z-index: 1;
+  top: 100%;
+  right: 0;
+  display: grid;
+  gap: 4px;
+  min-width: 120px;
+  padding: 6px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg);
+  box-shadow: 0 4px 12px rgb(0 0 0 / 12%);
+}
+
+.chat-edit-message {
+  display: grid;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.chat-edit-message textarea {
+  width: min(360px, 60vw);
+  padding: 8px;
+  font: inherit;
+}
+
+.chat-edit-message > div {
+  display: flex;
+  gap: 8px;
+}
+
+.chat-edit-message button {
+  padding: 6px 10px;
 }
 
 .chat-composer {

@@ -104,6 +104,18 @@ class ChatConsumer(AsyncWebsocketConsumer):
             )
         )
 
+    async def chat_message_edited(self, event: dict[str, Any]) -> None:
+        await self.send(
+            text_data=json.dumps(
+                {
+                    "type": "message_edited",
+                    "message_id": event["message_id"],
+                    "content": event["content"],
+                    "edited_at": event["edited_at"],
+                }
+            )
+        )
+
     @database_sync_to_async
     def is_conversation_participant(self):
         # L'accès dépend du groupe lié à la conversation.

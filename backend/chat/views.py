@@ -6,12 +6,13 @@
 from asgiref.sync import async_to_sync
 from django.contrib.auth import get_user_model
 from django.shortcuts import get_object_or_404
+from django.utils import timezone
 from rest_framework import mixins, permissions, status, viewsets
 from rest_framework.decorators import action
 from rest_framework.exceptions import PermissionDenied
 from rest_framework.response import Response
 
-from .events import broadcast_message, broadcast_message_deleted
+from .events import broadcast_message, broadcast_message_deleted, broadcast_message_edited
 from .models import Conversation, Group, Membership, Message
 from .serializers import (
     ConversationCreateSerializer,
@@ -140,12 +141,14 @@ class ConversationViewSet(
 class MessageViewSet(
     mixins.ListModelMixin,
     mixins.CreateModelMixin,
+    mixins.UpdateModelMixin,
     mixins.DestroyModelMixin,
     viewsets.GenericViewSet,
 ):
     """
     GET  /api/messages/?conversation=<id>  -> messages of a conversation
     POST /api/messages/                    -> {"conversation": <id>, "content": "..."}
+    PATCH /api/messages/<id>/              -> update a message authored by the user
     DELETE /api/messages/<id>/             -> delete a message authored by the user
     """
 
@@ -207,3 +210,11 @@ class MessageViewSet(
         conversation_id = instance.conversation_id
         instance.delete()
         async_to_sync(broadcast_message_deleted)(message_id, conversation_id)
+
+    def perform_update(self, serializer):
+        message = serializer.instance
+        if message.sender_id != self.request.user.pk:
+            raise PermissionDenied("You can only edit your own messages.")
+
+        message = serializer.save(edited_at=timezone.now())
+        async_to_sync(broadcast_message_edited)(message)

@@ -4,11 +4,12 @@ from asgiref.sync import async_to_sync
 from channels.testing import WebsocketCommunicator
 from django.contrib.auth import get_user_model
 from django.test import TestCase, TransactionTestCase
+from django.utils import timezone
 from rest_framework.test import APIClient
 
 from mysite.asgi import application
 
-from .events import broadcast_message_deleted
+from .events import broadcast_message_deleted, broadcast_message_edited
 from .models import Conversation, Group, Membership, Message
 
 User = get_user_model()
@@ -62,6 +63,29 @@ class ChatConsumerTests(TransactionTestCase):
             message.id,
         )
 
+    def test_message_edit_is_broadcast_to_all_connected_members(self):
+        alice = User.objects.create_user(username="alice")
+        bob = User.objects.create_user(username="bob")
+        group = Group.objects.create(name="general")
+        Membership.objects.create(group=group, user=alice)
+        Membership.objects.create(group=group, user=bob)
+        conversation = Conversation.objects.create(group=group, name="general")
+        message = Message.objects.create(
+            conversation=conversation,
+            sender=alice,
+            content="Ancien texte",
+            edited_at=timezone.now(),
+        )
+        message.content = "Texte modifié"
+        message.save(update_fields=["content"])
+
+        async_to_sync(self.check_message_edit_broadcast)(
+            conversation.id,
+            alice,
+            bob,
+            message,
+        )
+
     async def check_message_deletion_broadcast(self, conversation_id, alice, bob, message_id):
         communicators = [
             WebsocketCommunicator(application, f"/api/ws/chat/{conversation_id}/")
@@ -81,6 +105,29 @@ class ChatConsumerTests(TransactionTestCase):
                 {"type": "message_deleted", "message_id": message_id},
             ],
         )
+
+        for communicator in communicators:
+            await communicator.disconnect()
+
+    async def check_message_edit_broadcast(self, conversation_id, alice, bob, message):
+        communicators = [
+            WebsocketCommunicator(application, f"/api/ws/chat/{conversation_id}/")
+            for _ in (alice, bob)
+        ]
+        for communicator, user in zip(communicators, (alice, bob), strict=True):
+            cast(dict[str, object], communicator.scope)["user"] = user
+            connected, _ = await communicator.connect()
+            self.assertTrue(connected)
+
+        await broadcast_message_edited(message)
+        events = [await communicator.receive_json_from() for communicator in communicators]
+        expected_event = {
+            "type": "message_edited",
+            "message_id": message.id,
+            "content": "Texte modifié",
+            "edited_at": message.edited_at.isoformat(),
+        }
+        self.assertEqual(events, [expected_event, expected_event])
 
         for communicator in communicators:
             await communicator.disconnect()
@@ -333,6 +380,50 @@ class GroupApiTests(TestCase):
 
         self.assertEqual(response.status_code, 403)
         self.assertTrue(Message.objects.filter(pk=message.id).exists())
+
+    def test_sender_can_edit_own_message(self):
+        group = Group.objects.create(name="Equipe de projet")
+        Membership.objects.create(group=group, user=self.alice)
+        conversation = Conversation.objects.create(group=group, name="General")
+        message = Message.objects.create(
+            conversation=conversation,
+            sender=self.alice,
+            content="Ancien texte",
+        )
+
+        self.api_client.force_authenticate(user=self.alice)
+        response = self.api_client.patch(
+            f"/api/messages/{message.id}/",
+            {"content": "Texte modifié"},
+            format="json",
+        )
+
+        message.refresh_from_db()
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(message.content, "Texte modifié")
+        self.assertIsNotNone(message.edited_at)
+
+    def test_member_cannot_edit_another_users_message(self):
+        group = Group.objects.create(name="Equipe de projet")
+        Membership.objects.create(group=group, user=self.alice)
+        Membership.objects.create(group=group, user=self.bob)
+        conversation = Conversation.objects.create(group=group, name="General")
+        message = Message.objects.create(
+            conversation=conversation,
+            sender=self.alice,
+            content="Message d'Alice",
+        )
+
+        self.api_client.force_authenticate(user=self.bob)
+        response = self.api_client.patch(
+            f"/api/messages/{message.id}/",
+            {"content": "Texte modifié"},
+            format="json",
+        )
+
+        message.refresh_from_db()
+        self.assertEqual(response.status_code, 403)
+        self.assertEqual(message.content, "Message d'Alice")
 
     def test_non_member_cannot_delete_a_message(self):
         group = Group.objects.create(name="Equipe de projet")
