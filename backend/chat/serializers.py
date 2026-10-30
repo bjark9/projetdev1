@@ -12,6 +12,7 @@ User = get_user_model()
 
 class MessageSerializer(serializers.ModelSerializer):
     sender = UserSerializer(read_only=True)
+    is_mine = serializers.SerializerMethodField()
 
     class Meta:
         model = Message
@@ -19,12 +20,17 @@ class MessageSerializer(serializers.ModelSerializer):
             "id",
             "conversation",
             "sender",
+            "is_mine",
             "content",
             "created_at",
             "edited_at",
             "read_by",
         ]
         read_only_fields = ["id", "sender", "created_at", "edited_at", "read_by"]
+
+    def get_is_mine(self, message):
+        request = self.context.get("request")
+        return request is not None and message.sender_id == request.user.pk
 
     def validate_conversation(self, conversation):
         # Cette validation protège aussi l'API HTTP, en plus du WebSocket.
@@ -36,12 +42,37 @@ class MessageSerializer(serializers.ModelSerializer):
 
 
 class GroupSerializer(serializers.ModelSerializer):
-    members = UserSerializer(many=True, read_only=True)
+    members = serializers.SerializerMethodField()
+    current_user_role = serializers.SerializerMethodField()
 
     class Meta:
         model = Group
-        fields = ["id", "name", "members", "created_at"]
+        fields = ["id", "name", "members", "current_user_role", "created_at"]
         read_only_fields = ["id", "members", "created_at"]
+
+    def get_members(self, group):
+        memberships = group.memberships.all()
+        return [
+            {
+                "user": UserSerializer(membership.user, context=self.context).data,
+                "role": membership.role,
+                "joined_at": membership.joined_at,
+            }
+            for membership in memberships
+        ]
+
+    def get_current_user_role(self, group):
+        request = self.context.get("request")
+        if request is None or not request.user.is_authenticated:
+            return None
+        return next(
+            (
+                membership.role
+                for membership in group.memberships.all()
+                if membership.user_id == request.user.pk
+            ),
+            None,
+        )
 
 
 class GroupCreateSerializer(serializers.ModelSerializer):
@@ -73,7 +104,17 @@ class GroupCreateSerializer(serializers.ModelSerializer):
         users = validated_data.pop("member_ids")
         with transaction.atomic():
             group = Group.objects.create(**validated_data)
-            Membership.objects.bulk_create([Membership(group=group, user=u) for u in users])
+            creator = self.context["request"].user
+            Membership.objects.bulk_create(
+                [
+                    Membership(
+                        group=group,
+                        user=user,
+                        role=Membership.Role.OWNER if user.pk == creator.pk else Membership.Role.MEMBER,
+                    )
+                    for user in users
+                ]
+            )
         return group
 
     def to_representation(self, instance):
@@ -84,6 +125,7 @@ class GroupCreateSerializer(serializers.ModelSerializer):
 class ConversationSerializer(serializers.ModelSerializer):
     group = GroupSerializer(read_only=True)
     last_message = serializers.SerializerMethodField()
+    unread_count = serializers.SerializerMethodField()
 
     class Meta:
         model = Conversation
@@ -94,12 +136,19 @@ class ConversationSerializer(serializers.ModelSerializer):
             "created_at",
             "updated_at",
             "last_message",
+            "unread_count",
         ]
         read_only_fields = ["id", "created_at", "updated_at"]
 
     def get_last_message(self, obj):
         last = obj.messages.order_by("-created_at").first()
         return MessageSerializer(last, context=self.context).data if last else None
+
+    def get_unread_count(self, obj):
+        request = self.context.get("request")
+        if request is None or not request.user.is_authenticated:
+            return 0
+        return obj.messages.exclude(sender=request.user).exclude(read_by=request.user).count()
 
 
 class ConversationCreateSerializer(serializers.ModelSerializer):

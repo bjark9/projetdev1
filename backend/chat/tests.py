@@ -4,10 +4,12 @@ from asgiref.sync import async_to_sync
 from channels.testing import WebsocketCommunicator
 from django.contrib.auth import get_user_model
 from django.test import TestCase, TransactionTestCase
+from django.utils import timezone
 from rest_framework.test import APIClient
 
 from mysite.asgi import application
 
+from .events import broadcast_message_deleted, broadcast_message_edited
 from .models import Conversation, Group, Membership, Message
 
 User = get_user_model()
@@ -21,6 +23,9 @@ class ChatConsumerTests(TransactionTestCase):
         Membership.objects.create(group=group, user=user)
         conversation = Conversation.objects.create(group=group, name="general")
 
+        user.first_name = "Alice"
+        user.last_name = "Martin"
+        user.save(update_fields=["first_name", "last_name"])
         async_to_sync(self.check_websocket)(conversation.id, user)
 
         self.assertEqual(Message.objects.count(), 1)
@@ -37,6 +42,95 @@ class ChatConsumerTests(TransactionTestCase):
         async_to_sync(self.check_broadcast_to_members)(conversation.id, alice, bob)
 
         self.assertEqual(Message.objects.count(), 1)
+
+    def test_message_deletion_is_broadcast_to_all_connected_members(self):
+        alice = User.objects.create_user(username="alice")
+        bob = User.objects.create_user(username="bob")
+        group = Group.objects.create(name="general")
+        Membership.objects.create(group=group, user=alice)
+        Membership.objects.create(group=group, user=bob)
+        conversation = Conversation.objects.create(group=group, name="general")
+        message = Message.objects.create(
+            conversation=conversation,
+            sender=alice,
+            content="Bonjour",
+        )
+
+        async_to_sync(self.check_message_deletion_broadcast)(
+            conversation.id,
+            alice,
+            bob,
+            message.id,
+        )
+
+    def test_message_edit_is_broadcast_to_all_connected_members(self):
+        alice = User.objects.create_user(username="alice")
+        bob = User.objects.create_user(username="bob")
+        group = Group.objects.create(name="general")
+        Membership.objects.create(group=group, user=alice)
+        Membership.objects.create(group=group, user=bob)
+        conversation = Conversation.objects.create(group=group, name="general")
+        message = Message.objects.create(
+            conversation=conversation,
+            sender=alice,
+            content="Ancien texte",
+            edited_at=timezone.now(),
+        )
+        message.content = "Texte modifié"
+        message.save(update_fields=["content"])
+
+        async_to_sync(self.check_message_edit_broadcast)(
+            conversation.id,
+            alice,
+            bob,
+            message,
+        )
+
+    async def check_message_deletion_broadcast(self, conversation_id, alice, bob, message_id):
+        communicators = [
+            WebsocketCommunicator(application, f"/api/ws/chat/{conversation_id}/")
+            for _ in (alice, bob)
+        ]
+        for communicator, user in zip(communicators, (alice, bob), strict=True):
+            cast(dict[str, object], communicator.scope)["user"] = user
+            connected, _ = await communicator.connect()
+            self.assertTrue(connected)
+
+        await broadcast_message_deleted(message_id, conversation_id)
+        events = [await communicator.receive_json_from() for communicator in communicators]
+        self.assertEqual(
+            events,
+            [
+                {"type": "message_deleted", "message_id": message_id},
+                {"type": "message_deleted", "message_id": message_id},
+            ],
+        )
+
+        for communicator in communicators:
+            await communicator.disconnect()
+
+    async def check_message_edit_broadcast(self, conversation_id, alice, bob, message):
+        communicators = [
+            WebsocketCommunicator(application, f"/api/ws/chat/{conversation_id}/")
+            for _ in (alice, bob)
+        ]
+        for communicator, user in zip(communicators, (alice, bob), strict=True):
+            cast(dict[str, object], communicator.scope)["user"] = user
+            connected, _ = await communicator.connect()
+            self.assertTrue(connected)
+
+        await broadcast_message_edited(message)
+        events = [await communicator.receive_json_from() for communicator in communicators]
+        expected_event = {
+            "type": "message_edited",
+            "message_id": message.id,
+            "content": "Texte modifié",
+            "edited_at": message.edited_at.isoformat(),
+        }
+        self.assertEqual(events, [expected_event, expected_event])
+
+        for communicator in communicators:
+            await communicator.disconnect()
 
     def test_non_member_cannot_connect(self):
         # Le groupe existe, mais l'utilisateur n'en est pas membre.
@@ -74,6 +168,8 @@ class ChatConsumerTests(TransactionTestCase):
 
         self.assertEqual(response["content"], "Bonjour")
         self.assertEqual(response["sender_username"], "alice")
+        self.assertEqual(response["sender_display_name"], "Alice Martin")
+        self.assertTrue(response["is_mine"])
 
         await communicator.disconnect()
 
@@ -84,15 +180,26 @@ class ChatConsumerTests(TransactionTestCase):
             connected, _ = await communicator.connect()
             self.assertTrue(connected)
 
+        notifications = WebsocketCommunicator(application, "/api/ws/notifications/")
+        cast(dict[str, object], notifications.scope)["user"] = bob
+        notifications_connected, _ = await notifications.connect()
+        self.assertTrue(notifications_connected)
+
         await communicators[0].send_json_to({"content": "Bonjour"})
         alice_message = await communicators[0].receive_json_from()
         bob_message = await communicators[1].receive_json_from()
+        notification = await notifications.receive_json_from()
 
         self.assertEqual(alice_message["content"], "Bonjour")
-        self.assertEqual(bob_message, alice_message)
+        self.assertTrue(alice_message["is_mine"])
+        self.assertFalse(bob_message["is_mine"])
+        self.assertEqual(bob_message["sender_username"], "alice")
+        self.assertEqual(bob_message["sender_display_name"], "alice")
+        self.assertEqual(notification["conversation_id"], conversation_id)
 
         await communicators[0].disconnect()
         await communicators[1].disconnect()
+        await notifications.disconnect()
 
     async def check_rejected_websocket(self, conversation_id, user):
         communicator = WebsocketCommunicator(
@@ -142,6 +249,14 @@ class GroupApiTests(TestCase):
         self.assertEqual(response.status_code, 201)
         self.assertEqual(Group.objects.count(), 1)
         self.assertEqual(Membership.objects.count(), 2)
+        self.assertEqual(
+            Membership.objects.get(group_id=response.data["id"], user=self.alice).role,
+            Membership.Role.OWNER,
+        )
+        self.assertEqual(
+            Membership.objects.get(group_id=response.data["id"], user=self.bob).role,
+            Membership.Role.MEMBER,
+        )
 
     def test_member_can_list_his_groups(self):
         group = Group.objects.create(name="Equipe de projet")
@@ -193,6 +308,175 @@ class GroupApiTests(TestCase):
         self.assertEqual(response.status_code, 201)
         self.assertEqual(Message.objects.get().content, "Bonjour")
 
+    def test_message_history_includes_sender_name_and_ownership(self):
+        group = Group.objects.create(name="Equipe de projet")
+        Membership.objects.create(group=group, user=self.alice)
+        Membership.objects.create(group=group, user=self.bob)
+        conversation = Conversation.objects.create(group=group, name="General")
+        message = Message.objects.create(
+            conversation=conversation,
+            sender=self.alice,
+            content="Bonjour",
+        )
+
+        self.api_client.force_authenticate(user=self.bob)
+        response = self.api_client.get(f"/api/messages/?conversation={conversation.id}")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data[0]["id"], message.id)
+        self.assertEqual(response.data[0]["sender"]["username"], "alice")
+        self.assertEqual(response.data[0]["sender"]["display_name"], "alice")
+        self.assertFalse(response.data[0]["is_mine"])
+
+        self.api_client.force_authenticate(user=self.alice)
+        own_history = self.api_client.get(f"/api/messages/?conversation={conversation.id}")
+
+        self.assertTrue(own_history.data[0]["is_mine"])
+
+    def test_message_history_uses_first_and_last_name_when_available(self):
+        self.alice.first_name = "Alice"
+        self.alice.last_name = "Martin"
+        self.alice.save(update_fields=["first_name", "last_name"])
+        group = Group.objects.create(name="Equipe de projet")
+        Membership.objects.create(group=group, user=self.alice)
+        Membership.objects.create(group=group, user=self.bob)
+        conversation = Conversation.objects.create(group=group, name="General")
+        Message.objects.create(conversation=conversation, sender=self.alice, content="Bonjour")
+
+        self.api_client.force_authenticate(user=self.bob)
+        response = self.api_client.get(f"/api/messages/?conversation={conversation.id}")
+
+        self.assertEqual(response.data[0]["sender"]["display_name"], "Alice Martin")
+
+    def test_sender_can_delete_own_message(self):
+        group = Group.objects.create(name="Equipe de projet")
+        Membership.objects.create(group=group, user=self.alice)
+        conversation = Conversation.objects.create(group=group, name="General")
+        message = Message.objects.create(
+            conversation=conversation,
+            sender=self.alice,
+            content="À supprimer",
+        )
+
+        self.api_client.force_authenticate(user=self.alice)
+        response = self.api_client.delete(f"/api/messages/{message.id}/")
+
+        self.assertEqual(response.status_code, 204)
+        self.assertFalse(Message.objects.filter(pk=message.id).exists())
+
+    def test_member_cannot_delete_another_users_message(self):
+        group = Group.objects.create(name="Equipe de projet")
+        Membership.objects.create(group=group, user=self.alice)
+        Membership.objects.create(group=group, user=self.bob)
+        conversation = Conversation.objects.create(group=group, name="General")
+        message = Message.objects.create(
+            conversation=conversation,
+            sender=self.alice,
+            content="Message d'Alice",
+        )
+
+        self.api_client.force_authenticate(user=self.bob)
+        response = self.api_client.delete(f"/api/messages/{message.id}/")
+
+        self.assertEqual(response.status_code, 403)
+        self.assertTrue(Message.objects.filter(pk=message.id).exists())
+
+    def test_sender_can_edit_own_message(self):
+        group = Group.objects.create(name="Equipe de projet")
+        Membership.objects.create(group=group, user=self.alice)
+        conversation = Conversation.objects.create(group=group, name="General")
+        message = Message.objects.create(
+            conversation=conversation,
+            sender=self.alice,
+            content="Ancien texte",
+        )
+
+        self.api_client.force_authenticate(user=self.alice)
+        response = self.api_client.patch(
+            f"/api/messages/{message.id}/",
+            {"content": "Texte modifié"},
+            format="json",
+        )
+
+        message.refresh_from_db()
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(message.content, "Texte modifié")
+        self.assertIsNotNone(message.edited_at)
+
+    def test_member_cannot_edit_another_users_message(self):
+        group = Group.objects.create(name="Equipe de projet")
+        Membership.objects.create(group=group, user=self.alice)
+        Membership.objects.create(group=group, user=self.bob)
+        conversation = Conversation.objects.create(group=group, name="General")
+        message = Message.objects.create(
+            conversation=conversation,
+            sender=self.alice,
+            content="Message d'Alice",
+        )
+
+        self.api_client.force_authenticate(user=self.bob)
+        response = self.api_client.patch(
+            f"/api/messages/{message.id}/",
+            {"content": "Texte modifié"},
+            format="json",
+        )
+
+        message.refresh_from_db()
+        self.assertEqual(response.status_code, 403)
+        self.assertEqual(message.content, "Message d'Alice")
+
+    def test_non_member_cannot_delete_a_message(self):
+        group = Group.objects.create(name="Equipe de projet")
+        Membership.objects.create(group=group, user=self.alice)
+        conversation = Conversation.objects.create(group=group, name="General")
+        message = Message.objects.create(
+            conversation=conversation,
+            sender=self.alice,
+            content="Message privé",
+        )
+
+        self.api_client.force_authenticate(user=self.bob)
+        response = self.api_client.delete(f"/api/messages/{message.id}/")
+
+        self.assertEqual(response.status_code, 404)
+        self.assertTrue(Message.objects.filter(pk=message.id).exists())
+
+    def test_conversation_includes_unread_count_and_mark_read_clears_it(self):
+        group = Group.objects.create(name="Equipe de projet")
+        Membership.objects.create(group=group, user=self.alice)
+        Membership.objects.create(group=group, user=self.bob)
+        conversation = Conversation.objects.create(group=group, name="General")
+        Message.objects.create(conversation=conversation, sender=self.alice, content="Bonjour")
+
+        self.api_client.force_authenticate(user=self.bob)
+        conversation_response = self.api_client.get(f"/api/conversations/{conversation.id}/")
+        self.assertEqual(conversation_response.data["unread_count"], 1)
+
+        mark_read_response = self.api_client.post(
+            "/api/messages/mark-read/",
+            {"conversation": conversation.id},
+            format="json",
+        )
+        self.assertEqual(mark_read_response.status_code, 200)
+        self.assertEqual(mark_read_response.data["marked_read"], 1)
+
+        refreshed_conversation = self.api_client.get(f"/api/conversations/{conversation.id}/")
+        self.assertEqual(refreshed_conversation.data["unread_count"], 0)
+
+    def test_member_cannot_mark_non_member_conversation_as_read(self):
+        group = Group.objects.create(name="Equipe de projet")
+        Membership.objects.create(group=group, user=self.alice)
+        conversation = Conversation.objects.create(group=group, name="General")
+
+        self.api_client.force_authenticate(user=self.bob)
+        response = self.api_client.post(
+            "/api/messages/mark-read/",
+            {"conversation": conversation.id},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 404)
+
     def test_non_member_cannot_send_message(self):
         # La validation du serializer bloque l'écriture hors du groupe.
         group = Group.objects.create(name="Equipe de projet")
@@ -209,9 +493,9 @@ class GroupApiTests(TestCase):
         self.assertEqual(response.status_code, 400)
         self.assertEqual(Message.objects.count(), 0)
 
-    def test_member_can_add_another_member(self):
+    def test_owner_can_add_another_member(self):
         group = Group.objects.create(name="Equipe de projet")
-        Membership.objects.create(group=group, user=self.alice)
+        Membership.objects.create(group=group, user=self.alice, role=Membership.Role.OWNER)
 
         self.api_client.force_authenticate(user=self.alice)
         response = self.api_client.post(
@@ -222,10 +506,15 @@ class GroupApiTests(TestCase):
 
         self.assertEqual(response.status_code, 201)
         self.assertTrue(Membership.objects.filter(group=group, user=self.bob).exists())
+        self.assertEqual(response.data["current_user_role"], Membership.Role.OWNER)
+        self.assertEqual(
+            next(member["role"] for member in response.data["members"] if member["user"]["id"] == self.bob.id),
+            Membership.Role.MEMBER,
+        )
 
-    def test_member_can_remove_a_member(self):
+    def test_owner_can_remove_a_member(self):
         group = Group.objects.create(name="Equipe de projet")
-        Membership.objects.create(group=group, user=self.alice)
+        Membership.objects.create(group=group, user=self.alice, role=Membership.Role.OWNER)
         Membership.objects.create(group=group, user=self.bob)
 
         self.api_client.force_authenticate(user=self.alice)
@@ -233,6 +522,79 @@ class GroupApiTests(TestCase):
 
         self.assertEqual(response.status_code, 204)
         self.assertFalse(Membership.objects.filter(group=group, user=self.bob).exists())
+
+    def test_regular_member_cannot_manage_members(self):
+        group = Group.objects.create(name="Equipe de projet")
+        Membership.objects.create(group=group, user=self.alice, role=Membership.Role.OWNER)
+        Membership.objects.create(group=group, user=self.bob, role=Membership.Role.MEMBER)
+        charlie = User.objects.create_user(username="charlie")
+
+        self.api_client.force_authenticate(user=self.bob)
+        response = self.api_client.post(
+            f"/api/groups/{group.id}/members/",
+            {"user_id": charlie.id},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 403)
+        self.assertFalse(Membership.objects.filter(group=group, user=charlie).exists())
+
+    def test_admin_can_add_and_remove_members_but_not_admins(self):
+        group = Group.objects.create(name="Equipe de projet")
+        Membership.objects.create(group=group, user=self.alice, role=Membership.Role.OWNER)
+        Membership.objects.create(group=group, user=self.bob, role=Membership.Role.ADMIN)
+        charlie = User.objects.create_user(username="charlie")
+        dave = User.objects.create_user(username="dave")
+        Membership.objects.create(group=group, user=dave, role=Membership.Role.ADMIN)
+
+        self.api_client.force_authenticate(user=self.bob)
+        add_response = self.api_client.post(
+            f"/api/groups/{group.id}/members/",
+            {"user_id": charlie.id},
+            format="json",
+        )
+        self.assertEqual(add_response.status_code, 201)
+
+        remove_member_response = self.api_client.delete(
+            f"/api/groups/{group.id}/members/{charlie.id}/"
+        )
+        self.assertEqual(remove_member_response.status_code, 204)
+
+        remove_admin_response = self.api_client.delete(
+            f"/api/groups/{group.id}/members/{dave.id}/"
+        )
+        self.assertEqual(remove_admin_response.status_code, 403)
+        remove_owner_response = self.api_client.delete(
+            f"/api/groups/{group.id}/members/{self.alice.id}/"
+        )
+        self.assertEqual(remove_owner_response.status_code, 400)
+        self.assertTrue(Membership.objects.filter(group=group, user=self.alice).exists())
+        self.assertTrue(Membership.objects.filter(group=group, user=dave).exists())
+
+    def test_only_owner_can_change_member_role(self):
+        group = Group.objects.create(name="Equipe de projet")
+        Membership.objects.create(group=group, user=self.alice, role=Membership.Role.OWNER)
+        Membership.objects.create(group=group, user=self.bob, role=Membership.Role.MEMBER)
+
+        self.api_client.force_authenticate(user=self.bob)
+        forbidden = self.api_client.patch(
+            f"/api/groups/{group.id}/members/{self.bob.id}/role/",
+            {"role": Membership.Role.ADMIN},
+            format="json",
+        )
+        self.assertEqual(forbidden.status_code, 403)
+
+        self.api_client.force_authenticate(user=self.alice)
+        response = self.api_client.patch(
+            f"/api/groups/{group.id}/members/{self.bob.id}/role/",
+            {"role": Membership.Role.ADMIN},
+            format="json",
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(
+            Membership.objects.get(group=group, user=self.bob).role,
+            Membership.Role.ADMIN,
+        )
 
     def test_non_member_cannot_manage_group_members(self):
         group = Group.objects.create(name="Equipe de projet")

@@ -1,4 +1,4 @@
-import { useAuth } from '@clerk/react'
+import { Show, UserButton, useAuth } from '@clerk/react'
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import './App.css'
@@ -7,12 +7,23 @@ type Conversation = {
   id: number
   name: string
   updated_at: string
+  unread_count: number
   group: {
     members: unknown[]
   }
 }
 
-const backendUrl = import.meta.env.VITE_BACKEND_URL ?? 'http://localhost:8000'
+const backendUrl =
+  import.meta.env.VITE_BACKEND_URL ??
+  (import.meta.env.PROD ? '' : 'http://localhost:8000')
+
+function notificationWebsocketUrl() {
+  const wsBase = backendUrl
+    ? backendUrl.replace(/^http/, 'ws')
+    : `${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}`
+
+  return `${wsBase}/api/ws/notifications/`
+}
 
 function ConversationPage() {
   const navigate = useNavigate()
@@ -21,8 +32,9 @@ function ConversationPage() {
   const [error, setError] = useState('')
   const [groupName, setGroupName] = useState('')
   const [conversationName, setConversationName] = useState('')
-  const [memberId, setMemberId] = useState('')
+  const [memberIds, setMemberIds] = useState('')
   const [isCreating, setIsCreating] = useState(false)
+  const conversationIds = conversations.map(({ id }) => id).join(',')
 
   useEffect(() => {
     if (!isLoaded || !isSignedIn) return
@@ -52,6 +64,42 @@ function ConversationPage() {
     void loadConversations()
   }, [getToken, isLoaded, isSignedIn])
 
+  useEffect(() => {
+    if (!isLoaded || !isSignedIn || !conversationIds) return
+
+    let isCancelled = false
+    const sockets: WebSocket[] = []
+
+    async function subscribeToMessages() {
+      const token = await getToken()
+      if (!token || isCancelled) return
+
+      const socket = new WebSocket(notificationWebsocketUrl(), ['clerk', token])
+      sockets.push(socket)
+      socket.onmessage = (event) => {
+        const notification = JSON.parse(event.data) as {
+          conversation_id: number
+        }
+        setConversations((current) =>
+          current.map((item) =>
+            item.id === notification.conversation_id
+              ? { ...item, unread_count: item.unread_count + 1 }
+              : item,
+          ),
+        )
+      }
+      socket.onerror = () => {
+        setError('Les notifications temps réel sont momentanément indisponibles.')
+      }
+    }
+
+    void subscribeToMessages()
+    return () => {
+      isCancelled = true
+      sockets.forEach((socket) => socket.close())
+    }
+  }, [conversationIds, getToken, isLoaded, isSignedIn])
+
   function enterConversation(conversationId: number) {
     navigate(`/conversation/${conversationId}`)
   }
@@ -59,16 +107,27 @@ function ConversationPage() {
   async function createConversation() {
     // Un groupe est créé avant la conversation qui lui est rattachée.
     const token = await getToken()
-    const parsedMemberId = Number(memberId)
+    const memberIdValues = memberIds
+      .split(',')
+      .map((memberId) => memberId.trim())
+      .filter(Boolean)
+    const parsedMemberIds = memberIdValues.map(Number)
 
     if (!token) {
       setError('Connexion Clerk nécessaire')
       return
     }
-    if (!groupName.trim() || !conversationName.trim() || !parsedMemberId) {
+    if (!groupName.trim() || !conversationName.trim() || !parsedMemberIds.length) {
       setError(
-        'Remplis le nom du groupe, le nom de la conversation et un ID membre',
+        'Remplis le nom du groupe, le nom de la conversation et au moins un ID membre',
       )
+      return
+    }
+    if (
+      memberIdValues.some((memberId) => !/^\d+$/.test(memberId)) ||
+      parsedMemberIds.some((memberId) => !Number.isSafeInteger(memberId) || memberId < 1)
+    ) {
+      setError('Les IDs des membres doivent être des nombres entiers positifs, séparés par des virgules')
       return
     }
 
@@ -84,7 +143,7 @@ function ConversationPage() {
         },
         body: JSON.stringify({
           name: groupName.trim(),
-          member_ids: [parsedMemberId],
+          member_ids: [...new Set(parsedMemberIds)],
         }),
       })
       if (!groupResponse.ok) {
@@ -118,7 +177,7 @@ function ConversationPage() {
       setConversations((current) => [conversation, ...current])
       setGroupName('')
       setConversationName('')
-      setMemberId('')
+      setMemberIds('')
     } catch (creationError) {
       setError(
         creationError instanceof Error
@@ -133,7 +192,7 @@ function ConversationPage() {
   return (
     <main>
       <nav className="nav-shell" aria-label="Main navigation">
-        <a className="brand" href="#top" aria-label="Relay home">
+        <a className="brand" href="/" aria-label="Relay home">
           <span className="brand-mark" aria-hidden="true">
             <span />
           </span>
@@ -142,6 +201,9 @@ function ConversationPage() {
         <div className="nav-links">
           <a href="/">Home</a>
         </div>
+        <Show when="signed-in">
+          <UserButton />
+        </Show>
       </nav>
 
       <section className="conversation-section" id="top">
@@ -167,11 +229,11 @@ function ConversationPage() {
             placeholder="Nom du groupe"
           />
           <input
-            aria-label="ID du membre"
+            aria-label="IDs des membres"
             inputMode="numeric"
-            value={memberId}
-            onChange={(event) => setMemberId(event.target.value)}
-            placeholder="ID du deuxième membre"
+            value={memberIds}
+            onChange={(event) => setMemberIds(event.target.value)}
+            placeholder="IDs des membres (séparés par des virgules)"
           />
           <input
             aria-label="Nom de la conversation"
@@ -196,7 +258,16 @@ function ConversationPage() {
                 onClick={() => enterConversation(conversation.id)}
               >
                 <div className="conversation-row-main">
-                  <span className="conversation-status" />
+                  {conversation.unread_count > 0 ? (
+                    <span
+                      className="conversation-unread-indicator"
+                      aria-label={`${conversation.unread_count} message${conversation.unread_count === 1 ? '' : 's'} non lu${conversation.unread_count === 1 ? '' : 's'}`}
+                    >
+                      {conversation.unread_count}
+                    </span>
+                  ) : (
+                    <span className="conversation-status" />
+                  )}
                   <span className="conversation-row-name">
                     {conversation.name}
                   </span>
