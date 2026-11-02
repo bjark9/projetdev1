@@ -21,7 +21,11 @@ class Group(models.Model):
 
 
 class Membership(models.Model):
-    # Cette table relie un utilisateur à un groupe et pourra porter un rôle plus tard.
+    class Role(models.TextChoices):
+        OWNER = "owner", "Owner"
+        ADMIN = "admin", "Admin"
+        MEMBER = "member", "Member"
+
     user = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.CASCADE,
@@ -33,10 +37,18 @@ class Membership(models.Model):
         related_name="memberships",
         null=True,
     )
+    role = models.CharField(max_length=10, choices=Role.choices, default=Role.MEMBER)
     joined_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
-        constraints = [models.UniqueConstraint(fields=["user", "group"], name="unique_user_per_group")]
+        constraints = [
+            models.UniqueConstraint(fields=["user", "group"], name="unique_user_per_group"),
+            models.UniqueConstraint(
+                fields=["group"],
+                condition=models.Q(role="owner", group__isnull=False),
+                name="unique_group_owner",
+            ),
+        ]
 
     def __str__(self) -> str:
         return f"{self.user} in {self.group}"

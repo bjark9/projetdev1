@@ -112,13 +112,31 @@ WSGI_APPLICATION = "mysite.wsgi.application"
 
 ASGI_APPLICATION = "mysite.asgi.application"
 
-# Backend local utilisé par Channels pour diffuser les messages WebSocket.
-# En production, Redis remplacera ce stockage en mémoire.
-CHANNEL_LAYERS = {
-    "default": {
-        "BACKEND": "channels.layers.InMemoryChannelLayer",
-    },
-}
+# Redis shares WebSocket broadcasts between backend worker processes. Keep the
+# in-memory layer for local development and tests that do not configure Redis.
+REDIS_URL = os.environ.get("REDIS_URL")
+if REDIS_URL and "test" not in sys.argv:
+    CHANNEL_LAYERS = {
+        "default": {
+            "BACKEND": "channels_redis.core.RedisChannelLayer",
+            "CONFIG": {
+                "hosts": [
+                    {
+                        "address": REDIS_URL,
+                        "socket_timeout": 30,
+                        "socket_connect_timeout": 10,
+                        "health_check_interval": 15,
+                    }
+                ],
+            },
+        }
+    }
+else:
+    CHANNEL_LAYERS = {
+        "default": {
+            "BACKEND": "channels.layers.InMemoryChannelLayer",
+        },
+    }
 
 
 # Database

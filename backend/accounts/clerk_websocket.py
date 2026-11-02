@@ -1,3 +1,4 @@
+import logging  # for debugging -> delete after maybe?
 import os
 from collections.abc import Awaitable, Callable
 from typing import Any
@@ -7,6 +8,8 @@ from clerk_backend_api.security import TokenVerificationError, VerifyTokenOption
 from django.contrib.auth.models import AnonymousUser
 
 from .models import User
+
+logger = logging.getLogger(__name__)
 
 Scope = dict[str, Any]
 Receive = Callable[[], Awaitable[dict[str, Any]]]
@@ -26,6 +29,7 @@ class ClerkWebSocketMiddleware:
         # Sans sous-protocole Clerk, on conserve le mode local/session des tests.
         token = self._get_token(scope)
         if not token:
+            logger.warning("WS Clerk: pas de sous-protocole ['clerk', <token>]")  # Token absent
             return await self.app(scope, receive, send)
 
         user = await self._get_user(token)
@@ -46,16 +50,27 @@ class ClerkWebSocketMiddleware:
 
     @staticmethod
     async def _get_user(token: str):
+        secret = os.environ.get("CLERK_SECRET_KEY")
         try:
             # La vérification utilise le même secret Clerk que l'auth HTTP.
             payload = await verify_token_async(
                 token,
                 VerifyTokenOptions(
                     secret_key=os.environ.get("CLERK_SECRET_KEY"),
-                    authorized_parties=["http://localhost:5173"],
+                    authorized_parties=[
+                        "http://localhost:5173",
+                        "https://projetdev1-dusky.vercel.app",
+                    ],
                 ),
             )
-        except TokenVerificationError:
+        except TokenVerificationError as exc:
+            logger.warning(
+                "WS Clerk: token refusé: %r | reason=%s | secret_set=%s | secret_prefix=%s",
+                exc,
+                getattr(exc, "reason", None),
+                bool(secret),
+                (secret or "")[:7],
+            )
             return AnonymousUser()
 
         clerk_id = payload.get("sub")

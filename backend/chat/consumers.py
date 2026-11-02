@@ -4,6 +4,7 @@
 # then joins a conversation group named after the conversation ID.
 # Incoming messages get saved to the DB and broadcast to everyone in that group.
 import json
+import logging
 from typing import Any, cast
 
 from channels.db import database_sync_to_async
@@ -11,7 +12,10 @@ from channels.generic.websocket import AsyncWebsocketConsumer
 
 from accounts.models import User
 
+from .events import broadcast_message
 from .models import Conversation, Message
+
+logger = logging.getLogger(__name__)
 
 
 class ChatConsumer(AsyncWebsocketConsumer):
@@ -23,6 +27,13 @@ class ChatConsumer(AsyncWebsocketConsumer):
     async def connect(self):
         # Le middleware Clerk ou les tests placent l'utilisateur dans le scope ASGI.
         self.user = cast(User, self.scope["user"])
+        user = self.scope["user"]
+        logger.warning(
+            "WS connect: conv=%s user_id=%s authenticated=%s",
+            self.scope["url_route"]["kwargs"]["conversation_id"],
+            getattr(user, "id", None),
+            getattr(user, "is_authenticated", False),
+        )
         self.conversation_id = self.scope["url_route"]["kwargs"]["conversation_id"]
         self.conversation_group_name = f"chat_{self.conversation_id}"
 
@@ -63,20 +74,9 @@ class ChatConsumer(AsyncWebsocketConsumer):
             return
 
         # On sauvegarde avant de diffuser afin d'obtenir un ID et une date.
-        message = await self.save_message(content)
+        message, member_ids = await self.save_message(content)
 
-        # group_send transmet le message à tous les sockets de la conversation.
-        await self.channel_layer.group_send(
-            self.conversation_group_name,
-            {
-                "type": "chat_message",
-                "message_id": message.id,
-                "content": message.content,
-                "sender_id": self.user.id,
-                "sender_username": self.user.username,
-                "created_at": message.created_at.isoformat(),
-            },
-        )
+        await broadcast_message(message, member_ids)
 
     async def chat_message(self, event: dict[str, Any]) -> None:
         # Cette méthode est appelée pour chaque message diffusé au groupe.
@@ -87,7 +87,31 @@ class ChatConsumer(AsyncWebsocketConsumer):
                     "content": event["content"],
                     "sender_id": event["sender_id"],
                     "sender_username": event["sender_username"],
+                    "sender_display_name": event["sender_display_name"],
+                    "is_mine": event["sender_id"] == self.user.id,
                     "created_at": event["created_at"],
+                }
+            )
+        )
+
+    async def chat_message_deleted(self, event: dict[str, Any]) -> None:
+        await self.send(
+            text_data=json.dumps(
+                {
+                    "type": "message_deleted",
+                    "message_id": event["message_id"],
+                }
+            )
+        )
+
+    async def chat_message_edited(self, event: dict[str, Any]) -> None:
+        await self.send(
+            text_data=json.dumps(
+                {
+                    "type": "message_edited",
+                    "message_id": event["message_id"],
+                    "content": event["content"],
+                    "edited_at": event["edited_at"],
                 }
             )
         )
@@ -99,8 +123,40 @@ class ChatConsumer(AsyncWebsocketConsumer):
 
     @database_sync_to_async
     def save_message(self, content):
-        return Message.objects.create(
+        message = Message.objects.create(
             conversation_id=self.conversation_id,
             sender=self.user,
             content=content,
+        )
+        member_ids = list(message.conversation.group.memberships.values_list("user_id", flat=True))
+        return message, member_ids
+
+
+class NotificationConsumer(AsyncWebsocketConsumer):
+    async def connect(self):
+        self.user = cast(User, self.scope["user"])
+        if not self.user.is_authenticated:
+            await self.close()
+            return
+
+        self.notification_group_name = f"notifications_{self.user.id}"
+        await self.channel_layer.group_add(self.notification_group_name, self.channel_name)
+        clerk_subprotocol = cast(str | None, self.scope.get("clerk_subprotocol"))
+        if clerk_subprotocol:
+            await self.accept(subprotocol=clerk_subprotocol)
+        else:
+            await self.accept()
+
+    async def disconnect(self, close_code):
+        if hasattr(self, "notification_group_name"):
+            await self.channel_layer.group_discard(self.notification_group_name, self.channel_name)
+
+    async def notification_message(self, event: dict[str, Any]) -> None:
+        await self.send(
+            text_data=json.dumps(
+                {
+                    "conversation_id": event["conversation_id"],
+                    "message_id": event["message_id"],
+                }
+            )
         )
