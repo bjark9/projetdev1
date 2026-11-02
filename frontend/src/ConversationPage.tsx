@@ -2,6 +2,7 @@ import { Show, UserButton, useAuth } from '@clerk/react'
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import './App.css'
+import ThemeToggle from './ThemeToggle'
 
 type Conversation = {
   id: number
@@ -89,7 +90,9 @@ function ConversationPage() {
         )
       }
       socket.onerror = () => {
-        setError('Les notifications temps réel sont momentanément indisponibles.')
+        setError(
+          'Les notifications temps réel sont momentanément indisponibles.',
+        )
       }
     }
 
@@ -117,7 +120,11 @@ function ConversationPage() {
       setError('Connexion Clerk nécessaire')
       return
     }
-    if (!groupName.trim() || !conversationName.trim() || !parsedMemberIds.length) {
+    if (
+      !groupName.trim() ||
+      !conversationName.trim() ||
+      !parsedMemberIds.length
+    ) {
       setError(
         'Remplis le nom du groupe, le nom de la conversation et au moins un ID membre',
       )
@@ -125,9 +132,13 @@ function ConversationPage() {
     }
     if (
       memberIdValues.some((memberId) => !/^\d+$/.test(memberId)) ||
-      parsedMemberIds.some((memberId) => !Number.isSafeInteger(memberId) || memberId < 1)
+      parsedMemberIds.some(
+        (memberId) => !Number.isSafeInteger(memberId) || memberId < 1,
+      )
     ) {
-      setError('Les IDs des membres doivent être des nombres entiers positifs, séparés par des virgules')
+      setError(
+        'Les IDs des membres doivent être des nombres entiers positifs, séparés par des virgules',
+      )
       return
     }
 
@@ -149,7 +160,9 @@ function ConversationPage() {
       if (!groupResponse.ok) {
         const details = await groupResponse.text()
         console.error('POST /api/groups/', groupResponse.status, details)
-        throw new Error(`Impossible de créer le groupe (${groupResponse.status})`)
+        throw new Error(
+          `Impossible de créer le groupe (${groupResponse.status})`,
+        )
       }
 
       const group = (await groupResponse.json()) as { id: number }
@@ -201,8 +214,12 @@ function ConversationPage() {
         <div className="nav-links">
           <a href="/">Home</a>
         </div>
+        <ThemeToggle />
         <Show when="signed-in">
-          <UserButton />
+          <div className="profile-menu">
+            <span className="profile-label">Mon profil</span>
+            <UserButton />
+          </div>
         </Show>
       </nav>
 
@@ -274,6 +291,12 @@ function ConversationPage() {
                 </div>
                 <div className="conversation-row-meta">
                   <span>{conversation.group.members.length} people</span>
+                  {conversation.unread_count > 0 && (
+                    <strong className="conversation-unread-label">
+                      {conversation.unread_count} non lu
+                      {conversation.unread_count > 1 ? 's' : ''}
+                    </strong>
+                  )}
                   <span className="meta-divider" />
                   <span className="meta-muted">
                     {new Date(conversation.updated_at).toLocaleString()}

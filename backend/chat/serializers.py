@@ -13,6 +13,7 @@ User = get_user_model()
 class MessageSerializer(serializers.ModelSerializer):
     sender = UserSerializer(read_only=True)
     is_mine = serializers.SerializerMethodField()
+    reactions = serializers.SerializerMethodField()
 
     class Meta:
         model = Message
@@ -25,12 +26,30 @@ class MessageSerializer(serializers.ModelSerializer):
             "created_at",
             "edited_at",
             "read_by",
+            "is_pinned",
+            "pinned_at",
+            "reactions",
         ]
-        read_only_fields = ["id", "sender", "created_at", "edited_at", "read_by"]
+        read_only_fields = [
+            "id",
+            "sender",
+            "created_at",
+            "edited_at",
+            "read_by",
+            "is_pinned",
+            "pinned_at",
+            "reactions",
+        ]
 
     def get_is_mine(self, message):
         request = self.context.get("request")
         return request is not None and message.sender_id == request.user.pk
+
+    def get_reactions(self, message):
+        counts: dict[str, int] = {}
+        for reaction in message.reactions.all():
+            counts[reaction.emoji] = counts.get(reaction.emoji, 0) + 1
+        return counts
 
     def validate_conversation(self, conversation):
         # Cette validation protège aussi l'API HTTP, en plus du WebSocket.

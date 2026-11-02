@@ -92,9 +92,26 @@ class Message(models.Model):
         related_name="read_messages",
         blank=True,
     )
+    is_pinned = models.BooleanField(default=False)
+    pinned_at = models.DateTimeField(blank=True, null=True)
 
     class Meta:
         ordering = ["created_at"]
 
     def __str__(self) -> str:
         return self.content or f"Message {self.pk}"
+
+
+class Reaction(models.Model):
+    # Une personne ne peut ajouter qu'une seule fois le même emoji à un message.
+    message = models.ForeignKey(Message, on_delete=models.CASCADE, related_name="reactions")
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
+    emoji = models.CharField(max_length=8)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(fields=["message", "user", "emoji"], name="unique_message_reaction"),
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.emoji} on message {self.message_id}"

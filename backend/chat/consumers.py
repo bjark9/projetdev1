@@ -69,6 +69,16 @@ class ChatConsumer(AsyncWebsocketConsumer):
 
         # Les messages WebSocket sont de petits objets JSON.
         data = json.loads(text_data)
+        if data.get("type") == "typing":
+            await self.channel_layer.group_send(
+                self.conversation_group_name,
+                {
+                    "type": "user_typing",
+                    "user_id": self.user.id,
+                    "display_name": self.user.get_full_name().strip() or self.user.get_username(),
+                },
+            )
+            return
         content = data.get("content", "").strip()
         if not content:
             return
@@ -115,6 +125,10 @@ class ChatConsumer(AsyncWebsocketConsumer):
                 }
             )
         )
+
+    async def user_typing(self, event: dict[str, Any]) -> None:
+        if event["user_id"] != self.user.id:
+            await self.send(text_data=json.dumps({"type": "typing", "display_name": event["display_name"]}))
 
     @database_sync_to_async
     def is_conversation_participant(self):

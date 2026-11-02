@@ -12,7 +12,7 @@ from rest_framework.exceptions import PermissionDenied
 from rest_framework.response import Response
 
 from .events import broadcast_message, broadcast_message_deleted, broadcast_message_edited
-from .models import Conversation, Group, Membership, Message
+from .models import Conversation, Group, Membership, Message, Reaction
 from .serializers import (
     ConversationCreateSerializer,
     ConversationSerializer,
@@ -187,7 +187,32 @@ class MessageViewSet(
         )  # Récupère l'ID de la conversation à partir des paramètres de requête
         if conversation_id:
             qs = qs.filter(conversation_id=conversation_id)
+        search = self.request.query_params.get("search", "").strip()
+        if search:
+            # La recherche reste volontairement simple pour être facile à comprendre.
+            qs = qs.filter(content__icontains=search)
         return qs
+
+    @action(detail=True, methods=["post"], url_path="react")
+    def react(self, request, pk=None):
+        # Cliquer une deuxième fois sur le même emoji le retire.
+        message = self.get_object()
+        emoji = str(request.data.get("emoji", "")).strip()
+        if emoji not in ("👍", "❤️", "😂", "🎉", "👀"):
+            return Response({"emoji": "Emoji non autorisé."}, status=status.HTTP_400_BAD_REQUEST)
+        reaction, created = Reaction.objects.get_or_create(message=message, user=request.user, emoji=emoji)
+        if not created:
+            reaction.delete()
+        return Response({"emoji": emoji, "active": created}, status=status.HTTP_200_OK)
+
+    @action(detail=True, methods=["post"], url_path="pin")
+    def pin(self, request, pk=None):
+        # L'épingle est un simple interrupteur : activée ou désactivée.
+        message = self.get_object()
+        message.is_pinned = not message.is_pinned
+        message.pinned_at = timezone.now() if message.is_pinned else None
+        message.save(update_fields=["is_pinned", "pinned_at"])
+        return Response({"is_pinned": message.is_pinned})
 
     def perform_create(self, serializer):
         # Le client ne choisit jamais l'expéditeur: il vient du token Clerk.
