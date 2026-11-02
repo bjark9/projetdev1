@@ -1,11 +1,24 @@
-# Projet : Chat App
+# [Projet: Chat App]
 
 [![CI](https://github.com/bjark9/projetdev1/actions/workflows/ci.yml/badge.svg)](https://github.com/bjark9/projetdev1/actions/workflows/ci.yml)
 
-Application de chat temps réel pour équipes (B2B), réalisée dans le cadre du
+[Une application de chat temps réel pour équipes (B2B) — pensez Slack, Teams ou Discord, version professionnelle.]
+
 Projet 1 du cours *Projet d'intégration de développement*.
 
-**Application en ligne :** l'URL publique sera ajoutée après le déploiement.
+**Application en ligne :** [À COMPLÉTER : URL de production]
+
+## Sommaire
+
+- [Fonctionnalités](#fonctionnalités)
+- [Stack technique](#stack-technique)
+- [Structure du dépôt](#structure-du-dépôt)
+- [Installation en local](#installation-en-local)
+- [Variables d'environnement](#variables-denvironnement)
+- [Tests et qualité du code](#tests-et-qualité-du-code)
+- [CI/CD et déploiement](#cicd-et-déploiement)
+- [Workflow Git](#workflow-git)
+- [Équipe](#équipe)
 
 ## Fonctionnalités
 
@@ -19,10 +32,8 @@ Projet 1 du cours *Projet d'intégration de développement*.
 - voir le nombre de messages non lus par conversation ;
 - gérer les membres d'un groupe et leurs rôles ;
 - protéger l'accès aux conversations avec Clerk.
-- [Fonctionnalité 1: envoyer et lire des messages dans une conversation]
-- Joindre plusieurs fichiers à un message; les fichiers sont stockés en base PostgreSQL (Neon en production), jusqu'à 10 Mio par fichier et 25 Mio par envoi.
-- [Fonctionnalité 2: gestion des membres et des permissions ]
-- [À COMPLÉTER : fonctionnalité 3]
+- joindre plusieurs fichiers à un message; les fichiers sont stockés en base PostgreSQL (Neon en production), jusqu'à 10 Mio par fichier et 25 Mio par envoi.
+-
 
 ## Stack technique
 
@@ -35,21 +46,17 @@ Projet 1 du cours *Projet d'intégration de développement*.
 | Temps réel | WebSockets avec Django Channels et Redis |
 | Tests | Tests Django |
 | Lint / style | Ruff, mypy, Oxlint et Prettier |
-| Backend | [Django - Python ] |
-| Frontend | [React] |
-| Base de données | PostgreSQL (Neon en production) |
-| Tests | [À COMPLÉTER : Pest / pytest / Vitest…] |
-| Lint / style | [ruff / ESLint / Prettier] |
 | CI/CD | GitHub Actions |
-| Hébergement | Vercel pour le frontend ; backend et services à configurer |
+| Hébergement | Vercel |
 
 ## Structure du dépôt
 
 ```text
 .
-├── backend/              # API et logique métier Django
-├── frontend/             # Interface React
-├── .github/workflows/    # Pipeline GitHub Actions
+├── backend/     # API et logique métier
+├── frontend/    # Interface utilisateur
+├── .github/
+│   └── workflows/   # Pipelines GitHub Actions
 └── README.md
 ```
 
@@ -66,7 +73,7 @@ Projet 1 du cours *Projet d'intégration de développement*.
 
 ### 1. Cloner le dépôt
 
-```powershell
+```bash
 git clone https://github.com/bjark9/projetdev1.git
 cd projetdev1
 ```
@@ -82,8 +89,6 @@ pip install -r requirements-dev.txt
 python manage.py migrate
 python manage.py runserver 8000
 ```
-
-Le backend est disponible sur `http://localhost:8000`.
 
 ### 3. Lancer le frontend
 
@@ -152,16 +157,6 @@ npm run build
 Les tests couvrent notamment l'authentification, les permissions des groupes,
 l'envoi de messages, la gestion des membres et les WebSockets.
 
-### Dépannage avec les logs
-
-Le backend affiche chaque requête HTTP, son statut, l'utilisateur reconnu et
-sa durée dans le terminal Django. Il affiche aussi les étapes d'authentification
-Clerk et de connexion WebSocket.
-
-Dans le navigateur, ouvre `F12`, puis l'onglet **Console**. Les messages qui
-commencent par `[Relay ...]` indiquent l'étape exacte qui échoue. Les tokens
-Clerk et les contenus des messages ne sont volontairement jamais affichés.
-
 ## CI/CD et déploiement
 
 Le workflow GitHub Actions
@@ -180,13 +175,11 @@ seront ajoutés lorsqu'ils seront configurés.
 
 ## Workflow Git
 
-1. Créer une branche depuis `main` :
-   `git switch -c feature/nom-de-la-fonctionnalite`.
+1. Créer une branche depuis `main` : `git switch -c feature/nom-de-la-fonctionnalité`
 2. Commiter par petites étapes avec des messages clairs.
-3. Pousser la branche :
-   `git push -u origin feature/nom-de-la-fonctionnalite`.
-4. Ouvrir une Pull Request vers `main`.
-5. Attendre que la CI soit verte et qu'un autre membre relise la Pull Request.
+3. Pousser la branche : `git push -u origin feature/nom-de-la-fonctionnalité`
+4. Ouvrir une pull request vers `main`.
+5. Attendre que la CI soit verte et qu'un autre membre de l'équipe relise la PR.
 6. Merger, puis supprimer la branche.
 
 ## Équipe
