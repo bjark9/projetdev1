@@ -3,7 +3,8 @@ from typing import Any
 from channels.db import database_sync_to_async
 from channels.layers import get_channel_layer
 
-from .models import Conversation, Message
+from .models import Conversation, Message, MessageAttachment
+from .serializers import AttachmentSerializer
 
 
 async def broadcast_message(message: Message) -> None:
@@ -21,6 +22,7 @@ async def broadcast_message(message: Message) -> None:
         "sender_username": sender.username,
         "sender_display_name": sender.get_full_name().strip() or sender.get_username(),
         "created_at": message.created_at.isoformat(),
+        "attachments": await message_attachments(message.pk),
     }
     await channel_layer.group_send(f"chat_{conversation_id}", event)
 
@@ -77,3 +79,14 @@ def conversation_member_ids(conversation_id: int) -> list[int]:
             flat=True,
         )
     )
+
+
+@database_sync_to_async
+def message_attachments(message_id: int) -> list[dict[str, Any]]:
+    return [
+        dict(attachment)
+        for attachment in AttachmentSerializer(
+            MessageAttachment.objects.filter(message_id=message_id),
+            many=True,
+        ).data
+    ]

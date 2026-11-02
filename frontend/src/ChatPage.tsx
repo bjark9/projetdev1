@@ -13,6 +13,14 @@ type ChatMessage = {
   created_at: string
   edited_at?: string | null
   is_mine: boolean
+  attachments?: MessageAttachment[]
+}
+
+type MessageAttachment = {
+  id: number
+  filename: string
+  size: number
+  download_url: string
 }
 
 type ChatMessageDeletedEvent = {
@@ -52,6 +60,7 @@ type MessageHistoryItem = {
   created_at: string
   edited_at: string | null
   is_mine: boolean
+  attachments?: MessageAttachment[]
 }
 
 type ConversationDetails = {
@@ -76,8 +85,12 @@ function ChatPage() {
   const { conversationId } = useParams<{ conversationId: string }>()
   const { getToken, isLoaded, isSignedIn } = useAuth()
   const socketRef = useRef<WebSocket | null>(null)
+  const fileInputRef = useRef<HTMLInputElement | null>(null)
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const [message, setMessage] = useState('')
+  const [files, setFiles] = useState<File[]>([])
+  const [isUploading, setIsUploading] = useState(false)
+  const [downloadingAttachmentId, setDownloadingAttachmentId] = useState<number | null>(null)
   const [status, setStatus] = useState('Connexion...')
   const [conversation, setConversation] = useState<ConversationDetails | null>(
     null,
@@ -136,6 +149,7 @@ function ChatPage() {
             created_at: item.created_at,
             edited_at: item.edited_at,
             is_mine: item.is_mine,
+            attachments: item.attachments ?? [],
           })),
         )
       } catch {
@@ -226,13 +240,79 @@ function ChatPage() {
     }
   }, [conversationId, getToken, isLoaded, isSignedIn])
 
-  function sendMessage(event: FormEvent<HTMLFormElement>) {
+  async function sendMessage(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
     const content = message.trim()
-    if (!content || socketRef.current?.readyState !== WebSocket.OPEN) return
+    if (!content && !files.length) return
+
+    setMessageError('')
+    if (files.length) {
+      setIsUploading(true)
+      try {
+        const token = await getToken()
+        if (!token) throw new Error('Connexion Clerk nécessaire')
+
+        const formData = new FormData()
+        formData.append('conversation', conversationId ?? '')
+        formData.append('content', content)
+        files.forEach((file) => formData.append('files', file))
+
+        const response = await fetch(`${backendUrl}/api/messages/upload/`, {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${token}` },
+          body: formData,
+        })
+        if (!response.ok) {
+          throw new Error(
+            'Impossible d’envoyer les fichiers. Taille maximale : 10 Mo par fichier et 25 Mo au total.',
+          )
+        }
+
+        setMessage('')
+        setFiles([])
+        if (fileInputRef.current) fileInputRef.current.value = ''
+      } catch (error) {
+        setMessageError(
+          error instanceof Error ? error.message : 'Impossible d’envoyer les fichiers.',
+        )
+      } finally {
+        setIsUploading(false)
+      }
+      return
+    }
+
+    if (socketRef.current?.readyState !== WebSocket.OPEN) return
 
     socketRef.current.send(JSON.stringify({ content }))
     setMessage('')
+  }
+
+  async function downloadAttachment(attachment: MessageAttachment) {
+    setMessageError('')
+    setDownloadingAttachmentId(attachment.id)
+    try {
+      const token = await getToken()
+      if (!token) throw new Error('Connexion Clerk nécessaire')
+      const response = await fetch(`${backendUrl}${attachment.download_url}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      })
+      if (!response.ok) throw new Error('Impossible de télécharger le fichier.')
+
+      const objectUrl = URL.createObjectURL(await response.blob())
+      const link = document.createElement('a')
+      link.href = objectUrl
+      link.download = attachment.filename
+      document.body.appendChild(link)
+      link.click()
+      link.remove()
+      window.setTimeout(() => URL.revokeObjectURL(objectUrl), 1000)
+    } catch (error) {
+      setMessageError(
+        error instanceof Error ? error.message : 'Impossible de télécharger le fichier.',
+      )
+    } finally {
+      setDownloadingAttachmentId(null)
+    }
   }
 
   async function deleteMessage(messageId: number) {
@@ -387,7 +467,24 @@ function ChatPage() {
                   </form>
                 ) : (
                   <>
-                    <p>{chatMessage.content}</p>
+                    {chatMessage.content && <p>{chatMessage.content}</p>}
+                    {!!chatMessage.attachments?.length && (
+                      <ul className="chat-attachments">
+                        {chatMessage.attachments.map((attachment) => (
+                          <li key={attachment.id}>
+                            <button
+                              type="button"
+                              disabled={downloadingAttachmentId === attachment.id}
+                              onClick={() => void downloadAttachment(attachment)}
+                            >
+                              {downloadingAttachmentId === attachment.id
+                                ? 'Téléchargement...'
+                                : `${attachment.filename} (${formatFileSize(attachment.size)})`}
+                            </button>
+                          </li>
+                        ))}
+                      </ul>
+                    )}
                     {chatMessage.edited_at && (
                       <small className="chat-message-edited">(modifié)</small>
                     )}
@@ -449,13 +546,25 @@ function ChatPage() {
             ))}
           </div>
           <form className="chat-composer" onSubmit={sendMessage}>
+            <label className="chat-file-picker">
+              Joindre
+              <input
+                ref={fileInputRef}
+                aria-label="Joindre des fichiers"
+                type="file"
+                multiple
+                onChange={(event) => setFiles(Array.from(event.target.files ?? []))}
+              />
+            </label>
             <input
               aria-label="Message"
               value={message}
               onChange={(event) => setMessage(event.target.value)}
               placeholder="Écrire un message..."
             />
-            <button type="submit">Envoyer</button>
+            <button type="submit" disabled={isUploading}>
+              {isUploading ? 'Envoi...' : 'Envoyer'}
+            </button>
           </form>
         </section>
         {conversation && (
@@ -472,6 +581,12 @@ function ChatPage() {
       </div>
     </main>
   )
+}
+
+function formatFileSize(size: number) {
+  if (size < 1024) return `${size} o`
+  if (size < 1024 * 1024) return `${(size / 1024).toFixed(1)} Ko`
+  return `${(size / (1024 * 1024)).toFixed(1)} Mo`
 }
 
 export default ChatPage

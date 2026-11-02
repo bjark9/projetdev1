@@ -23,6 +23,7 @@ Projet 1 du cours *Projet d'intégration de développement*.
 ## Fonctionnalités
 
 - [Fonctionnalité 1: envoyer et lire des messages dans une conversation]
+- Joindre plusieurs fichiers à un message; les fichiers sont stockés en base PostgreSQL (Neon en production), jusqu'à 10 Mio par fichier et 25 Mio par envoi.
 - [Fonctionnalité 2: gestion des membres et des permissions ]
 - [À COMPLÉTER : fonctionnalité 3]
 
@@ -32,7 +33,7 @@ Projet 1 du cours *Projet d'intégration de développement*.
 | --- | --- |
 | Backend | [Django - Python ] |
 | Frontend | [React] |
-| Base de données | [SQLite / MYSQL ??] |
+| Base de données | PostgreSQL (Neon en production) |
 | Tests | [À COMPLÉTER : Pest / pytest / Vitest…] |
 | Lint / style | [ruff / ESLint / Prettier] |
 | CI/CD | GitHub Actions |
