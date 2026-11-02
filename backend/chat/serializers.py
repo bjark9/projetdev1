@@ -14,6 +14,7 @@ User = get_user_model()
 class MessageSerializer(serializers.ModelSerializer):
     sender = UserSerializer(read_only=True)
     is_mine = serializers.SerializerMethodField()
+    attachments = serializers.SerializerMethodField()
     reactions = serializers.SerializerMethodField()
 
     class Meta:
@@ -27,6 +28,7 @@ class MessageSerializer(serializers.ModelSerializer):
             "created_at",
             "edited_at",
             "read_by",
+            "attachments",
             "is_pinned",
             "pinned_at",
             "reactions",

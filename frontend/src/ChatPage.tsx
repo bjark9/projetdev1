@@ -15,8 +15,17 @@ type ChatMessage = {
   created_at: string
   edited_at?: string | null
   is_mine: boolean
+  attachments?: MessageAttachment[]
   reactions?: Record<string, number>
   is_pinned?: boolean
+}
+
+type MessageAttachment = {
+  id: number
+  filename: string
+  content_type: string
+  size: number
+  download_url: string
 }
 
 type ChatMessageDeletedEvent = {
@@ -80,6 +89,7 @@ type MessageHistoryItem = {
   created_at: string
   edited_at: string | null
   is_mine: boolean
+  attachments: MessageAttachment[]
   reactions: Record<string, number>
   is_pinned: boolean
 }
@@ -239,6 +249,7 @@ function ChatPage() {
             created_at: item.created_at,
             edited_at: item.edited_at,
             is_mine: item.is_mine,
+            attachments: item.attachments ?? [],
             reactions: item.reactions,
             is_pinned: item.is_pinned,
           })),
@@ -625,7 +636,24 @@ function ChatPage() {
                     </form>
                   ) : (
                     <>
-                      <p>{chatMessage.content}</p>
+                      {chatMessage.content && <p>{chatMessage.content}</p>}
+                      {!!chatMessage.attachments?.length && (
+                        <ul className="chat-attachments">
+                          {chatMessage.attachments.map((attachment) => (
+                            <li key={attachment.id}>
+                              <button
+                                type="button"
+                                disabled={downloadingAttachmentId === attachment.id}
+                                onClick={() => void downloadAttachment(attachment)}
+                              >
+                                {downloadingAttachmentId === attachment.id
+                                  ? 'Téléchargement...'
+                                  : `${attachment.filename} (${formatFileSize(attachment.size)})`}
+                              </button>
+                            </li>
+                          ))}
+                        </ul>
+                      )}
                       {chatMessage.edited_at && (
                         <small className="chat-message-edited">(modifié)</small>
                       )}

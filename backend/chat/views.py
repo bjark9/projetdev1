@@ -17,7 +17,7 @@ from rest_framework.parsers import FormParser, MultiPartParser
 from rest_framework.response import Response
 
 from .events import broadcast_message, broadcast_message_deleted, broadcast_message_edited
-from .models import Conversation, Group, Membership, Message, Reaction
+from .models import Conversation, Group, Membership, Message, MessageAttachment, Reaction
 from .serializers import (
     ConversationCreateSerializer,
     ConversationSerializer,
@@ -200,6 +200,75 @@ class MessageViewSet(
             # La recherche reste volontairement simple pour être facile à comprendre.
             qs = qs.filter(content__icontains=search)
         return qs
+
+    @action(
+        detail=False,
+        methods=["post"],
+        url_path="upload",
+        parser_classes=[MultiPartParser, FormParser],
+    )
+    def upload(self, request):
+        conversation_id = request.data.get("conversation")
+        try:
+            conversation_id = int(conversation_id)
+        except (TypeError, ValueError):
+            return Response(
+                {"conversation": "A valid conversation ID is required."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        conversation = get_object_or_404(
+            Conversation.objects.filter(group__memberships__user=request.user),
+            pk=conversation_id,
+        )
+        files = request.FILES.getlist("files")
+        content = request.data.get("content", "")
+        if not isinstance(content, str):
+            return Response(
+                {"content": "Message content must be text."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        content = content.strip()
+        if not content and not files:
+            return Response(
+                {"detail": "Add a message or at least one file."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        if any(upload.size > MAX_ATTACHMENT_SIZE for upload in files):
+            return Response(
+                {"files": "Each file must be 10 MiB or smaller."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        if sum(upload.size for upload in files) > MAX_UPLOAD_SIZE:
+            return Response(
+                {"files": "The total upload size must be 25 MiB or smaller."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        with transaction.atomic():
+            message = Message.objects.create(
+                conversation=conversation,
+                sender=request.user,
+                content=content,
+            )
+            MessageAttachment.objects.bulk_create(
+                [
+                    MessageAttachment(
+                        message=message,
+                        filename=upload.name[:255],
+                        content_type=upload.content_type or "",
+                        size=upload.size,
+                        data=upload.read(),
+                    )
+                    for upload in files
+                ]
+            )
+            message.conversation.save(update_fields=["updated_at"])
+        async_to_sync(broadcast_message)(message)
+        return Response(
+            MessageSerializer(message, context={"request": request}).data,
+            status=status.HTTP_201_CREATED,
+        )
 
     @action(detail=True, methods=["post"], url_path="react")
     def react(self, request, pk=None):
