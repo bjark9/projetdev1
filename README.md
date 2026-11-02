@@ -186,8 +186,8 @@ seront ajoutés lorsqu'ils seront configurés.
 
 | Membre | Rôle / parties réalisées |
 | --- | --- |
-| Niels ([@bjark9](https://github.com/bjark9)) | [À COMPLÉTER] |
-| Lorian | [À COMPLÉTER] |
+| Niels ([@bjark9](https://github.com/bjark9)) | Backend, WebSockets et interface |
+| Lorian | Qualité du frontend, CI et contribution au backend |
 
 ## Licence
 
