@@ -6,6 +6,7 @@ import MembershipPanel from './MembershipPanel'
 import type { ChatGroup } from './MembershipPanel'
 import './ChatPage.css'
 import ThemeToggle from './ThemeToggle'
+import { debugError, debugLog } from './debug'
 
 type ChatMessage = {
   message_id: number
@@ -190,13 +191,18 @@ function ChatPage() {
     let isCancelled = false
 
     async function connect() {
+      debugLog('Chat page: requesting Clerk token')
       const token = await getToken()
       if (!token || isCancelled) {
+        debugLog('Chat page: Clerk token unavailable')
         setStatus('Connexion Clerk nécessaire')
         return
       }
 
       try {
+        debugLog('Chat page: loading conversation and message history', {
+          conversationId: currentConversationId,
+        })
         const headers = { Authorization: `Bearer ${token}` }
         const [conversationResponse, historyResponse] = await Promise.all([
           fetch(`${backendUrl}/api/conversations/${currentConversationId}/`, {
@@ -208,6 +214,10 @@ function ChatPage() {
           ),
         ])
         if (!conversationResponse.ok || !historyResponse.ok) {
+          debugLog('Chat page: API returned an error', {
+            conversationStatus: conversationResponse.status,
+            historyStatus: historyResponse.status,
+          })
           throw new Error('Impossible de charger la conversation')
         }
         if (isCancelled) return
@@ -229,7 +239,9 @@ function ChatPage() {
             is_pinned: item.is_pinned,
           })),
         )
-      } catch {
+        debugLog('Chat page: conversation and history loaded')
+      } catch (error) {
+        debugError('Chat page: loading failed', error)
         setStatus('Impossible de charger la conversation')
         return
       }
@@ -264,10 +276,17 @@ function ChatPage() {
         'clerk',
         token,
       ])
+      debugLog('Chat WebSocket: opening', {
+        conversationId: currentConversationId,
+      })
       socketRef.current = socket
 
-      socket.onopen = () => setStatus('Connecté')
+      socket.onopen = () => {
+        debugLog('Chat WebSocket: connected')
+        setStatus('Connecté')
+      }
       socket.onmessage = (event) => {
+        debugLog('Chat WebSocket: message received')
         const incomingMessage = JSON.parse(event.data) as ChatMessageEvent
         if (isTypingEvent(incomingMessage)) {
           setTypingUser(incomingMessage.display_name)
@@ -314,8 +333,17 @@ function ChatPage() {
           })
         }
       }
-      socket.onerror = () => setStatus('Erreur de connexion')
-      socket.onclose = () => setStatus('Déconnecté')
+      socket.onerror = (error) => {
+        debugError('Chat WebSocket: error', error)
+        setStatus('Erreur de connexion')
+      }
+      socket.onclose = (event) => {
+        debugLog('Chat WebSocket: closed', {
+          code: event.code,
+          reason: event.reason,
+        })
+        setStatus('Déconnecté')
+      }
     }
 
     void connect()
@@ -332,6 +360,7 @@ function ChatPage() {
     const content = message.trim()
     if (!content || socketRef.current?.readyState !== WebSocket.OPEN) return
 
+    debugLog('Chat: sending message')
     socketRef.current.send(JSON.stringify({ content }))
     setMessage('')
   }

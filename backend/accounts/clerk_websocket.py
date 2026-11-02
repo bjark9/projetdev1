@@ -32,6 +32,7 @@ class ClerkWebSocketMiddleware:
             logger.warning("WS Clerk: pas de sous-protocole ['clerk', <token>]")  # Token absent
             return await self.app(scope, receive, send)
 
+        logger.info("WS Clerk: token received path=%s", scope.get("path"))
         user = await self._get_user(token)
 
         authenticated_scope = dict(scope)

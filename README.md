@@ -143,6 +143,16 @@ npm run build
 Les tests couvrent notamment l'authentification, les permissions des groupes,
 l'envoi de messages, la gestion des membres et les WebSockets.
 
+### Dépannage avec les logs
+
+Le backend affiche chaque requête HTTP, son statut, l'utilisateur reconnu et
+sa durée dans le terminal Django. Il affiche aussi les étapes d'authentification
+Clerk et de connexion WebSocket.
+
+Dans le navigateur, ouvre `F12`, puis l'onglet **Console**. Les messages qui
+commencent par `[Relay ...]` indiquent l'étape exacte qui échoue. Les tokens
+Clerk et les contenus des messages ne sont volontairement jamais affichés.
+
 ## CI/CD et déploiement
 
 Le workflow GitHub Actions

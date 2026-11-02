@@ -86,6 +86,7 @@ def _ensure_clerk_user(clerk_id: str) -> None:
 @csrf_exempt
 @require_POST
 def clerk_webhook(request: HttpRequest) -> HttpResponse:
+    logger.info("Clerk webhook: received request")
     signing_secret = settings.CLERK_WEBHOOK_SIGNING_SECRET
     if not signing_secret:
         logger.error("CLERK_WEBHOOK_SIGNING_SECRET is not configured")
@@ -107,6 +108,7 @@ def clerk_webhook(request: HttpRequest) -> HttpResponse:
         return HttpResponse("Invalid Clerk webhook payload", status=400)
 
     event_type = event.get("type")
+    logger.info("Clerk webhook: verified event type=%s", event_type)
     if event_type == "session.created":
         session_data = event.get("data")
         if not isinstance(session_data, dict):
@@ -115,6 +117,8 @@ def clerk_webhook(request: HttpRequest) -> HttpResponse:
         if not clerk_id:
             return HttpResponse("Invalid Clerk session payload", status=400)
         _ensure_clerk_user(clerk_id)
+        logger.info("Clerk webhook: session user synchronized")
+        logger.info("Clerk webhook: user synchronized")
         return JsonResponse({"status": "synced"})
 
     if event_type not in {"user.created", "user.updated"}:
