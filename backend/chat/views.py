@@ -2,13 +2,18 @@
 # C'est elle qui reçoit la requête HTTP, vérifie l'authentification et les permissions,
 # choisit quelles données récupérer (le queryset),
 # puis fait appel au serializer pour fabriquer la réponse.
+from io import BytesIO
+
 from asgiref.sync import async_to_sync
 from django.contrib.auth import get_user_model
+from django.db import transaction
+from django.http import FileResponse
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
 from rest_framework import mixins, permissions, status, viewsets
-from rest_framework.decorators import action
+from rest_framework.decorators import action, api_view, permission_classes
 from rest_framework.exceptions import PermissionDenied
+from rest_framework.parsers import FormParser, MultiPartParser
 from rest_framework.response import Response
 
 from .events import broadcast_message, broadcast_message_deleted, broadcast_message_edited
@@ -22,6 +27,8 @@ from .serializers import (
 )
 
 User = get_user_model()
+MAX_ATTACHMENT_SIZE = 10 * 1024 * 1024
+MAX_UPLOAD_SIZE = 25 * 1024 * 1024
 
 
 class GroupViewSet(
@@ -180,6 +187,7 @@ class MessageViewSet(
         qs = (  # Récupère les messages des conversations auxquelles l'utilisateur appartient
             Message.objects.filter(conversation__group__memberships__user=self.request.user.pk)
             .select_related("sender")
+            .prefetch_related("attachments")
             .order_by("-created_at")  # newest first: easier to paginate; reverse in React
         )
         conversation_id = self.request.query_params.get(
@@ -242,3 +250,22 @@ class MessageViewSet(
 
         message = serializer.save(edited_at=timezone.now())
         async_to_sync(broadcast_message_edited)(message)
+
+
+@api_view(["GET"])
+@permission_classes([permissions.IsAuthenticated])
+def download_attachment(request, pk):
+    attachment = get_object_or_404(
+        MessageAttachment.objects.filter(
+            message__conversation__group__memberships__user=request.user,
+        ),
+        pk=pk,
+    )
+    response = FileResponse(
+        BytesIO(bytes(attachment.data)),
+        as_attachment=True,
+        filename=attachment.filename,
+        content_type="application/octet-stream",
+    )
+    response["X-Content-Type-Options"] = "nosniff"
+    return response

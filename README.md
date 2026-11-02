@@ -19,6 +19,10 @@ Projet 1 du cours *Projet d'intégration de développement*.
 - voir le nombre de messages non lus par conversation ;
 - gérer les membres d'un groupe et leurs rôles ;
 - protéger l'accès aux conversations avec Clerk.
+- [Fonctionnalité 1: envoyer et lire des messages dans une conversation]
+- Joindre plusieurs fichiers à un message; les fichiers sont stockés en base PostgreSQL (Neon en production), jusqu'à 10 Mio par fichier et 25 Mio par envoi.
+- [Fonctionnalité 2: gestion des membres et des permissions ]
+- [À COMPLÉTER : fonctionnalité 3]
 
 ## Stack technique
 
@@ -31,6 +35,11 @@ Projet 1 du cours *Projet d'intégration de développement*.
 | Temps réel | WebSockets avec Django Channels et Redis |
 | Tests | Tests Django |
 | Lint / style | Ruff, mypy, Oxlint et Prettier |
+| Backend | [Django - Python ] |
+| Frontend | [React] |
+| Base de données | PostgreSQL (Neon en production) |
+| Tests | [À COMPLÉTER : Pest / pytest / Vitest…] |
+| Lint / style | [ruff / ESLint / Prettier] |
 | CI/CD | GitHub Actions |
 | Hébergement | Vercel pour le frontend ; backend et services à configurer |
 

@@ -1,11 +1,12 @@
 # Transform database objects into JSON (and back) for the API.
 from django.contrib.auth import get_user_model
 from django.db import transaction
+from django.urls import reverse
 from rest_framework import serializers
 
 from accounts.serializers import UserSerializer
 
-from .models import Conversation, Group, Membership, Message
+from .models import Conversation, Group, Membership, Message, MessageAttachment
 
 User = get_user_model()
 
@@ -41,6 +42,9 @@ class MessageSerializer(serializers.ModelSerializer):
             "reactions",
         ]
 
+    def get_attachments(self, message):
+        return AttachmentSerializer(message.attachments.all(), many=True, context=self.context).data
+
     def get_is_mine(self, message):
         request = self.context.get("request")
         return request is not None and message.sender_id == request.user.pk
@@ -58,6 +62,18 @@ class MessageSerializer(serializers.ModelSerializer):
         if not conversation.group.memberships.filter(user=request.user).exists():
             raise serializers.ValidationError("You are not a member of this conversation's group.")
         return conversation
+
+
+class AttachmentSerializer(serializers.ModelSerializer):
+    download_url = serializers.SerializerMethodField()
+
+    class Meta:
+        model = MessageAttachment
+        fields = ["id", "filename", "content_type", "size", "download_url"]
+        read_only_fields = fields
+
+    def get_download_url(self, attachment):
+        return reverse("attachment-download", kwargs={"pk": attachment.pk})
 
 
 class GroupSerializer(serializers.ModelSerializer):

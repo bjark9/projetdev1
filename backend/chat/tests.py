@@ -3,6 +3,7 @@ from typing import cast
 from asgiref.sync import async_to_sync
 from channels.testing import WebsocketCommunicator
 from django.contrib.auth import get_user_model
+from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import TestCase, TransactionTestCase
 from django.utils import timezone
 from rest_framework.test import APIClient
@@ -10,7 +11,7 @@ from rest_framework.test import APIClient
 from mysite.asgi import application
 
 from .events import broadcast_message_deleted, broadcast_message_edited
-from .models import Conversation, Group, Membership, Message
+from .models import Conversation, Group, Membership, Message, MessageAttachment
 
 User = get_user_model()
 
@@ -301,6 +302,77 @@ class GroupApiTests(TestCase):
 
         self.assertEqual(response.status_code, 201)
         self.assertEqual(Message.objects.get().content, "Bonjour")
+
+    def test_member_can_upload_and_download_message_attachment(self):
+        group = Group.objects.create(name="Equipe de projet")
+        Membership.objects.create(group=group, user=self.alice)
+        Membership.objects.create(group=group, user=self.bob)
+        conversation = Conversation.objects.create(group=group, name="General")
+        self.api_client.force_authenticate(user=self.alice)
+
+        response = self.api_client.post(
+            "/api/messages/upload/",
+            {
+                "conversation": str(conversation.id),
+                "content": "Voici le document",
+                "files": SimpleUploadedFile(
+                    "notes.txt",
+                    b"contenu persistant",
+                    content_type="text/plain",
+                ),
+            },
+            format="multipart",
+        )
+
+        self.assertEqual(response.status_code, 201)
+        attachment = MessageAttachment.objects.get()
+        self.assertEqual(bytes(attachment.data), b"contenu persistant")
+        self.assertEqual(response.data["attachments"][0]["filename"], "notes.txt")
+
+        self.api_client.force_authenticate(user=self.bob)
+        download_response = self.api_client.get(response.data["attachments"][0]["download_url"])
+
+        self.assertEqual(download_response.status_code, 200)
+        self.assertEqual(b"".join(download_response.streaming_content), b"contenu persistant")
+
+    def test_non_member_cannot_download_message_attachment(self):
+        group = Group.objects.create(name="Equipe de projet")
+        Membership.objects.create(group=group, user=self.alice)
+        conversation = Conversation.objects.create(group=group, name="General")
+        message = Message.objects.create(
+            conversation=conversation,
+            sender=self.alice,
+            content="",
+        )
+        attachment = MessageAttachment.objects.create(
+            message=message,
+            filename="notes.txt",
+            size=4,
+            data=b"data",
+        )
+        self.api_client.force_authenticate(user=self.bob)
+
+        response = self.api_client.get(f"/api/attachments/{attachment.id}/")
+
+        self.assertEqual(response.status_code, 404)
+
+    def test_upload_rejects_files_over_the_per_file_limit(self):
+        group = Group.objects.create(name="Equipe de projet")
+        Membership.objects.create(group=group, user=self.alice)
+        conversation = Conversation.objects.create(group=group, name="General")
+        self.api_client.force_authenticate(user=self.alice)
+
+        response = self.api_client.post(
+            "/api/messages/upload/",
+            {
+                "conversation": str(conversation.id),
+                "files": SimpleUploadedFile("large.bin", b"x" * (10 * 1024 * 1024 + 1)),
+            },
+            format="multipart",
+        )
+
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(Message.objects.count(), 0)
 
     def test_message_history_includes_sender_name_and_ownership(self):
         group = Group.objects.create(name="Equipe de projet")
