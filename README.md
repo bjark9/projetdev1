@@ -22,22 +22,32 @@ Projet 1 du cours *Projet d'intégration de développement*.
 
 ## Fonctionnalités
 
-- [Fonctionnalité 1: envoyer et lire des messages dans une conversation]
-- Joindre plusieurs fichiers à un message; les fichiers sont stockés en base PostgreSQL (Neon en production), jusqu'à 10 Mio par fichier et 25 Mio par envoi.
-- [Fonctionnalité 2: gestion des membres et des permissions ]
-- [À COMPLÉTER : fonctionnalité 3]
+- envoyer, recevoir et lire des messages dans une conversation ;
+- recevoir les nouveaux messages et notifications en temps réel ;
+- modifier ou supprimer ses propres messages ;
+- rechercher un mot dans les messages ;
+- réagir aux messages avec des emojis ;
+- voir quand un membre est en train d'écrire ;
+- épingler un message important ;
+- voir le nombre de messages non lus par conversation ;
+- gérer les membres d'un groupe et leurs rôles ;
+- protéger l'accès aux conversations avec Clerk.
+- joindre plusieurs fichiers à un message; les fichiers sont stockés en base PostgreSQL (Neon en production), jusqu'à 10 Mio par fichier et 25 Mio par envoi.
+-
 
 ## Stack technique
 
 | Couche | Technologie |
 | --- | --- |
-| Backend | [Django - Python ] |
-| Frontend | [React] |
-| Base de données | PostgreSQL (Neon en production) |
-| Tests | [À COMPLÉTER : Pest / pytest / Vitest…] |
-| Lint / style | [ruff / ESLint / Prettier] |
+| Backend | Django, Django REST Framework et Django Channels |
+| Frontend | React, TypeScript et Vite |
+| Authentification | Clerk |
+| Base de données | PostgreSQL avec Neon |
+| Temps réel | WebSockets avec Django Channels et Redis |
+| Tests | Tests Django |
+| Lint / style | Ruff, mypy, Oxlint et Prettier |
 | CI/CD | GitHub Actions |
-| Hébergement | Versel |
+| Hébergement | Vercel |
 
 ## Structure du dépôt
 
@@ -54,9 +64,12 @@ Projet 1 du cours *Projet d'intégration de développement*.
 
 ### Prérequis
 
-- Git
-- [À COMPLÉTER : version de Python / PHP / Node requise]
-- [À COMPLÉTER : autres outils, par exemple Composer, npm…]
+- Git ;
+- Python 3.12 ou plus récent ;
+- Node.js 22 ou plus récent ;
+- npm ;
+- une base PostgreSQL pour un déploiement complet ;
+- Redis pour le temps réel en production.
 
 ### 1. Cloner le dépôt
 
@@ -67,68 +80,98 @@ cd projetdev1
 
 ### 2. Lancer le backend
 
-```bash
-cd backend
-# [À COMPLÉTER : créer l'environnement et installer les dépendances]
-# [À COMPLÉTER : copier .env.example vers .env et le remplir]
-# [À COMPLÉTER : appliquer les migrations]
-# [À COMPLÉTER : démarrer le serveur]
-```
+Depuis le dossier `backend` :
 
-Le backend est disponible sur [À COMPLÉTER : http://localhost:PORT].
+```powershell
+python -m venv .venv
+.\.venv\Scripts\Activate.ps1
+pip install -r requirements-dev.txt
+python manage.py migrate
+python manage.py runserver 8000
+```
 
 ### 3. Lancer le frontend
 
-```bash
-cd frontend
-# [À COMPLÉTER : installer les dépendances]
-# [À COMPLÉTER : démarrer le serveur de développement]
+Depuis le dossier `frontend` :
+
+```powershell
+npm install
+npm run dev
 ```
 
-Le frontend est disponible sur [À COMPLÉTER : http://localhost:PORT].
+Le frontend est disponible sur `http://localhost:5173`.
 
 ## Variables d'environnement
 
-Le fichier `.env.example` liste toutes les variables nécessaires. Copiez-le en `.env` et adaptez les valeurs. Le fichier `.env` n'est **jamais** commité.
+Créez un fichier `.env` dans `backend/` et adaptez les valeurs. Ce fichier
+n'est **jamais** commité.
 
 | Variable | Rôle | Exemple |
 | --- | --- | --- |
-| [À COMPLÉTER] | [À COMPLÉTER] | [À COMPLÉTER] |
+| `DATABASE_URL` | Connexion à PostgreSQL | `postgresql://...` |
+| `DJANGO_SECRET_KEY` | Clé secrète Django | valeur secrète |
+| `DJANGO_DEBUG` | Active le mode debug local | `True` |
+| `CLERK_SECRET_KEY` | Authentification du backend avec Clerk | valeur secrète |
+| `CLERK_WEBHOOK_SIGNING_SECRET` | Vérification des webhooks Clerk | `whsec_...` |
+| `REDIS_URL` | Connexion Redis pour les WebSockets | URL Redis |
+| `DEBUG_DB_TOKEN` | Protection de la route de diagnostic | valeur secrète |
 
-Configure `REDIS_URL` in the deployed backend to point to a shared Redis instance. Django Channels uses Redis to deliver live chat messages between backend workers; without it, the in-memory layer is suitable only for local development and tests.
+En production, `REDIS_URL` doit pointer vers une instance Redis partagée.
+La couche mémoire est suffisante uniquement pour le développement local et les
+tests.
 
 ### Synchronisation des utilisateurs Clerk vers Neon
 
-Django utilise `DATABASE_URL` pour se connecter à Neon et `accounts.User` comme modèle utilisateur. Appliquez les migrations sur la base Neon après le déploiement (`python manage.py migrate`).
+Django utilise `DATABASE_URL` pour se connecter à Neon et
+`accounts.User` comme modèle utilisateur. Appliquez les migrations sur la
+base Neon après le déploiement :
 
-Dans le tableau de bord Clerk, créez un webhook vers `https://<votre-backend>/api/webhooks/clerk/` et abonnez-le aux événements `user.created`, `user.updated` et `session.created`. Ajoutez sa clé de signature (`whsec_...`) à l'environnement du backend sous `CLERK_WEBHOOK_SIGNING_SECRET`. Clerk vérifiera chaque livraison; les utilisateurs sont synchronisés de façon idempotente à la création ou à la connexion.
+```powershell
+python manage.py migrate
+```
 
-Pour tester localement, exposez le backend à Clerk via un tunnel HTTPS et configurez l'URL du webhook avec cette adresse publique.
+Dans le tableau de bord Clerk, créez un webhook vers
+`https://<votre-backend>/api/webhooks/clerk/` pour les événements
+`user.created`, `user.updated` et `session.created`. Ajoutez sa clé de
+signature à `CLERK_WEBHOOK_SIGNING_SECRET`.
 
 ## Tests et qualité du code
 
-```bash
-# Tests
-# [À COMPLÉTER : commande, par exemple php artisan test / pytest / npm test]
+Depuis le dossier `backend` :
 
-# Lint et formatage
-# [À COMPLÉTER : commande, par exemple vendor/bin/pint --test / ruff check . / npm run lint]
+```powershell
+python manage.py test accounts chat
+ruff check .
+ruff format --check .
+mypy .
 ```
 
-Les tests couvrent le cœur de l'application : [À COMPLÉTER : par exemple envoi et lecture de messages, permissions d'accès, validation des entrées].
+Depuis le dossier `frontend` :
+
+```powershell
+npm run lint
+npm run format:check
+npm run build
+```
+
+Les tests couvrent notamment l'authentification, les permissions des groupes,
+l'envoi de messages, la gestion des membres et les WebSockets.
 
 ## CI/CD et déploiement
 
-Le pipeline GitHub Actions (`.github/workflows/ci.yml`) se lance sur chaque pull request et sur chaque push vers `main`.
+Le workflow GitHub Actions
+[`CI-checks.yml`](.github/workflows/CI-checks.yml) se lance sur chaque Pull
+Request et sur chaque push vers `main`.
 
-| Job | Rôle |
+| Job | Vérifications |
 | --- | --- |
-| Tests | Lance la suite de tests sur une base de test |
-| Style | Vérifie le lint et le formatage, en parallèle des tests |
+| Backend | Ruff, formatage Ruff et mypy |
+| Frontend | Installation npm, Prettier, Oxlint et build Vite |
 
-- **`main` est protégée** : pas de push direct, une pull request est obligatoire et les checks doivent être verts avant le merge.
-- **Déploiement continu** : chaque merge sur `main` déclenche le déploiement chez [À COMPLÉTER : hébergeur].
-- Aucun secret n'est stocké dans le dépôt : les valeurs sensibles sont dans *Settings → Secrets and variables → Actions*.
+`main` doit être protégée : les changements passent par une Pull Request et
+les vérifications doivent être vertes avant le merge. Le frontend est préparé
+pour un déploiement sur Vercel. L'URL publique et le déploiement du backend
+seront ajoutés lorsqu'ils seront configurés.
 
 ## Workflow Git
 
