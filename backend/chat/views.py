@@ -1,7 +1,6 @@
-# Create your views here.
-# La vue est le point d'entrée. 
-# C'est elle qui reçoit la requête HTTP, vérifie l'authentification et les permissions, 
-# choisit quelles données récupérer (le queryset), 
+# La vue est le point d'entrée.
+# C'est elle qui reçoit la requête HTTP, vérifie l'authentification et les permissions,
+# choisit quelles données récupérer (le queryset),
 # puis fait appel au serializer pour fabriquer la réponse.
 from io import BytesIO
 
@@ -18,7 +17,7 @@ from rest_framework.parsers import FormParser, MultiPartParser
 from rest_framework.response import Response
 
 from .events import broadcast_message, broadcast_message_deleted, broadcast_message_edited
-from .models import Conversation, Group, Membership, Message, MessageAttachment
+from .models import Conversation, Group, Membership, Message, Reaction
 from .serializers import (
     ConversationCreateSerializer,
     ConversationSerializer,
@@ -178,8 +177,7 @@ class MessageViewSet(
         unread_messages = conversation.messages.exclude(sender=request.user).exclude(read_by=request.user)
         message_ids = list(unread_messages.values_list("pk", flat=True))
         read_memberships = [
-            Message.read_by.through(message_id=message_id, user_id=request.user.pk)
-            for message_id in message_ids
+            Message.read_by.through(message_id=message_id, user_id=request.user.pk) for message_id in message_ids
         ]
         Message.read_by.through.objects.bulk_create(read_memberships, ignore_conflicts=True)
         return Response({"marked_read": len(message_ids)}, status=status.HTTP_200_OK)
@@ -197,76 +195,32 @@ class MessageViewSet(
         )  # Récupère l'ID de la conversation à partir des paramètres de requête
         if conversation_id:
             qs = qs.filter(conversation_id=conversation_id)
+        search = self.request.query_params.get("search", "").strip()
+        if search:
+            # La recherche reste volontairement simple pour être facile à comprendre.
+            qs = qs.filter(content__icontains=search)
         return qs
 
-    @action(
-        detail=False,
-        methods=["post"],
-        url_path="upload",
-        parser_classes=[MultiPartParser, FormParser],
-    )
-    def upload(self, request):
-        conversation_id = request.data.get("conversation")
-        try:
-            conversation_id = int(conversation_id)
-        except (TypeError, ValueError):
-            return Response(
-                {"conversation": "A valid conversation ID is required."},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
+    @action(detail=True, methods=["post"], url_path="react")
+    def react(self, request, pk=None):
+        # Cliquer une deuxième fois sur le même emoji le retire.
+        message = self.get_object()
+        emoji = str(request.data.get("emoji", "")).strip()
+        if emoji not in ("👍", "❤️", "😂", "🎉", "👀"):
+            return Response({"emoji": "Emoji non autorisé."}, status=status.HTTP_400_BAD_REQUEST)
+        reaction, created = Reaction.objects.get_or_create(message=message, user=request.user, emoji=emoji)
+        if not created:
+            reaction.delete()
+        return Response({"emoji": emoji, "active": created}, status=status.HTTP_200_OK)
 
-        conversation = get_object_or_404(
-            Conversation.objects.filter(group__memberships__user=request.user),
-            pk=conversation_id,
-        )
-        files = request.FILES.getlist("files")
-        content = request.data.get("content", "")
-        if not isinstance(content, str):
-            return Response(
-                {"content": "Message content must be text."},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-        content = content.strip()
-        if not content and not files:
-            return Response(
-                {"detail": "Add a message or at least one file."},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-        if any(upload.size > MAX_ATTACHMENT_SIZE for upload in files):
-            return Response(
-                {"files": "Each file must be 10 MiB or smaller."},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-        if sum(upload.size for upload in files) > MAX_UPLOAD_SIZE:
-            return Response(
-                {"files": "The total upload size must be 25 MiB or smaller."},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-
-        with transaction.atomic():
-            message = Message.objects.create(
-                conversation=conversation,
-                sender=request.user,
-                content=content,
-            )
-            MessageAttachment.objects.bulk_create(
-                [
-                    MessageAttachment(
-                        message=message,
-                        filename=upload.name[:255],
-                        content_type=upload.content_type or "",
-                        size=upload.size,
-                        data=upload.read(),
-                    )
-                    for upload in files
-                ]
-            )
-            message.conversation.save(update_fields=["updated_at"])
-        async_to_sync(broadcast_message)(message)
-        return Response(
-            MessageSerializer(message, context={"request": request}).data,
-            status=status.HTTP_201_CREATED,
-        )
+    @action(detail=True, methods=["post"], url_path="pin")
+    def pin(self, request, pk=None):
+        # L'épingle est un simple interrupteur : activée ou désactivée.
+        message = self.get_object()
+        message.is_pinned = not message.is_pinned
+        message.pinned_at = timezone.now() if message.is_pinned else None
+        message.save(update_fields=["is_pinned", "pinned_at"])
+        return Response({"is_pinned": message.is_pinned})
 
     def perform_create(self, serializer):
         # Le client ne choisit jamais l'expéditeur: il vient du token Clerk.
@@ -277,7 +231,8 @@ class MessageViewSet(
         # (only needed if updated_at is auto_now)
         message.conversation.save(update_fields=["updated_at"])
 
-        async_to_sync(broadcast_message)(message)
+        member_ids = list(message.conversation.group.memberships.values_list("user_id", flat=True))
+        async_to_sync(broadcast_message)(message, member_ids)
 
     def perform_destroy(self, instance):
         if instance.sender_id != self.request.user.pk:

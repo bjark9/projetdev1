@@ -19,11 +19,7 @@ def debug_db(request):
 
     try:
         user_model = get_user_model()
-        latest_user_joined = (
-            user_model.objects.order_by("-date_joined")
-            .values_list("date_joined", flat=True)
-            .first()
-        )
+        latest_user_joined = user_model.objects.order_by("-date_joined").values_list("date_joined", flat=True).first()
         return JsonResponse(
             {
                 "vendor": connection.vendor,

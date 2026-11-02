@@ -29,22 +29,24 @@ class ChatConsumer(AsyncWebsocketConsumer):
         self.user = cast(User, self.scope["user"])
         user = self.scope["user"]
         logger.warning(
-        "WS connect: conv=%s user_id=%s authenticated=%s",
-        self.scope["url_route"]["kwargs"]["conversation_id"],
-        getattr(user, "id", None),
-        getattr(user, "is_authenticated", False),
-)
+            "WS connect: conv=%s user_id=%s authenticated=%s",
+            self.scope["url_route"]["kwargs"]["conversation_id"],
+            getattr(user, "id", None),
+            getattr(user, "is_authenticated", False),
+        )
         self.conversation_id = self.scope["url_route"]["kwargs"]["conversation_id"]
         self.conversation_group_name = f"chat_{self.conversation_id}"
 
         # Première barrière: une personne non connectée est refusée.
         if not self.user.is_authenticated:
+            logger.warning("WS chat: refused unauthenticated conv=%s", self.conversation_id)
             await self.close()
             return
 
         # Deuxième barrière: il faut aussi être membre du groupe.
         is_participant = await self.is_conversation_participant()
         if not is_participant:
+            logger.warning("WS chat: refused non-member user_id=%s conv=%s", self.user.id, self.conversation_id)
             await self.close()
             return
 
@@ -55,9 +57,11 @@ class ChatConsumer(AsyncWebsocketConsumer):
             await self.accept(subprotocol=clerk_subprotocol)
         else:
             await self.accept()
+        logger.info("WS chat: accepted user_id=%s conv=%s", self.user.id, self.conversation_id)
 
     async def disconnect(self, close_code):
         await self.channel_layer.group_discard(self.conversation_group_name, self.channel_name)
+        logger.info("WS chat: disconnected user_id=%s conv=%s code=%s", self.user.id, self.conversation_id, close_code)
 
     async def receive(
         self,
@@ -69,14 +73,27 @@ class ChatConsumer(AsyncWebsocketConsumer):
 
         # Les messages WebSocket sont de petits objets JSON.
         data = json.loads(text_data)
+        if data.get("type") == "typing":
+            logger.info("WS chat: typing user_id=%s conv=%s", self.user.id, self.conversation_id)
+            await self.channel_layer.group_send(
+                self.conversation_group_name,
+                {
+                    "type": "user_typing",
+                    "user_id": self.user.id,
+                    "display_name": self.user.get_full_name().strip() or self.user.get_username(),
+                },
+            )
+            return
         content = data.get("content", "").strip()
         if not content:
+            logger.info("WS chat: empty message ignored user_id=%s conv=%s", self.user.id, self.conversation_id)
             return
 
         # On sauvegarde avant de diffuser afin d'obtenir un ID et une date.
-        message = await self.save_message(content)
+        message, member_ids = await self.save_message(content)
 
-        await broadcast_message(message)
+        await broadcast_message(message, member_ids)
+        logger.info("WS chat: saved message_id=%s user_id=%s conv=%s", message.id, self.user.id, self.conversation_id)
 
     async def chat_message(self, event: dict[str, Any]) -> None:
         # Cette méthode est appelée pour chaque message diffusé au groupe.
@@ -117,6 +134,10 @@ class ChatConsumer(AsyncWebsocketConsumer):
             )
         )
 
+    async def user_typing(self, event: dict[str, Any]) -> None:
+        if event["user_id"] != self.user.id:
+            await self.send(text_data=json.dumps({"type": "typing", "display_name": event["display_name"]}))
+
     @database_sync_to_async
     def is_conversation_participant(self):
         # L'accès dépend du groupe lié à la conversation.
@@ -124,17 +145,20 @@ class ChatConsumer(AsyncWebsocketConsumer):
 
     @database_sync_to_async
     def save_message(self, content):
-        return Message.objects.create(
+        message = Message.objects.create(
             conversation_id=self.conversation_id,
             sender=self.user,
             content=content,
         )
+        member_ids = list(message.conversation.group.memberships.values_list("user_id", flat=True))
+        return message, member_ids
 
 
 class NotificationConsumer(AsyncWebsocketConsumer):
     async def connect(self):
         self.user = cast(User, self.scope["user"])
         if not self.user.is_authenticated:
+            logger.warning("WS notifications: refused unauthenticated connection")
             await self.close()
             return
 
@@ -145,6 +169,7 @@ class NotificationConsumer(AsyncWebsocketConsumer):
             await self.accept(subprotocol=clerk_subprotocol)
         else:
             await self.accept()
+        logger.info("WS notifications: accepted user_id=%s", self.user.id)
 
     async def disconnect(self, close_code):
         if hasattr(self, "notification_group_name"):

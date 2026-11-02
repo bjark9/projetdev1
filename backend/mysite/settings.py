@@ -35,7 +35,35 @@ SECRET_KEY = os.environ.get("DJANGO_SECRET_KEY", "dev-insecure-key")
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = os.environ.get("DJANGO_DEBUG", "False") == "True"
 
-ALLOWED_HOSTS = ["localhost", "127.0.0.1", ".ngrok-free.app", "hedging-outspoken-granular.ngrok-free.dev", "projetdev1-dusky.vercel.app"]
+LOGGING = {
+    "version": 1,
+    "disable_existing_loggers": False,
+    "formatters": {
+        "debug": {
+            "format": "{asctime} [{levelname}] {name}: {message}",
+            "style": "{",
+        },
+    },
+    "handlers": {
+        "console": {
+            "class": "logging.StreamHandler",
+            "formatter": "debug",
+        },
+    },
+    "loggers": {
+        "accounts": {"handlers": ["console"], "level": "INFO", "propagate": False},
+        "chat": {"handlers": ["console"], "level": "INFO", "propagate": False},
+        "mysite.requests": {"handlers": ["console"], "level": "INFO", "propagate": False},
+    },
+}
+
+ALLOWED_HOSTS = [
+    "localhost",
+    "127.0.0.1",
+    ".ngrok-free.app",
+    "hedging-outspoken-granular.ngrok-free.dev",
+    "projetdev1-dusky.vercel.app",
+]
 
 # Telling Django to use the user model
 AUTH_USER_MODEL = "accounts.User"
@@ -47,6 +75,7 @@ CLERK_WEBHOOK_SIGNING_SECRET = os.environ.get("CLERK_WEBHOOK_SIGNING_SECRET", ""
 INSTALLED_APPS = [
     "daphne",
     "channels",
+    "corsheaders",
     "django.contrib.admin",
     "django.contrib.auth",
     "django.contrib.contenttypes",
@@ -70,12 +99,19 @@ REST_FRAMEWORK = {
 
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
+    "mysite.debug_middleware.RequestDebugMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
+    "corsheaders.middleware.CorsMiddleware",
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
+]
+
+CORS_ALLOWED_ORIGINS = [
+    "http://localhost:5173",
+    "https://projetdev1-dusky.vercel.app",
 ]
 
 ROOT_URLCONF = "mysite.urls"
@@ -102,7 +138,7 @@ ASGI_APPLICATION = "mysite.asgi.application"
 # Redis shares WebSocket broadcasts between backend worker processes. Keep the
 # in-memory layer for local development and tests that do not configure Redis.
 REDIS_URL = os.environ.get("REDIS_URL")
-if REDIS_URL:
+if REDIS_URL and "test" not in sys.argv:
     CHANNEL_LAYERS = {
         "default": {
             "BACKEND": "channels_redis.core.RedisChannelLayer",

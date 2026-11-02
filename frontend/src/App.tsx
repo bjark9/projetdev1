@@ -3,6 +3,7 @@ import type { FormEvent } from 'react'
 import { useNavigate } from 'react-router-dom'
 import './App.css'
 import { Show, SignInButton, SignUpButton, UserButton } from '@clerk/react'
+import ThemeToggle from './ThemeToggle'
 
 function App() {
   const [message, setMessage] = useState('')
@@ -50,6 +51,7 @@ function App() {
           <a href="#ritual">Our approach</a>
           <a href="#footer">About</a>
         </div>
+        <ThemeToggle />
         <>
           <header>
             <Show when="signed-out">
@@ -57,7 +59,10 @@ function App() {
               <SignUpButton />
             </Show>
             <Show when="signed-in">
-              <UserButton />
+              <div className="profile-menu">
+                <span className="profile-label">Mon profil</span>
+                <UserButton />
+              </div>
             </Show>
           </header>
         </>

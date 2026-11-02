@@ -5,6 +5,8 @@ import { Link, useParams } from 'react-router-dom'
 import MembershipPanel from './MembershipPanel'
 import type { ChatGroup } from './MembershipPanel'
 import './ChatPage.css'
+import ThemeToggle from './ThemeToggle'
+import { debugError, debugLog } from './debug'
 
 type ChatMessage = {
   message_id: number
@@ -13,14 +15,8 @@ type ChatMessage = {
   created_at: string
   edited_at?: string | null
   is_mine: boolean
-  attachments?: MessageAttachment[]
-}
-
-type MessageAttachment = {
-  id: number
-  filename: string
-  size: number
-  download_url: string
+  reactions?: Record<string, number>
+  is_pinned?: boolean
 }
 
 type ChatMessageDeletedEvent = {
@@ -36,7 +32,10 @@ type ChatMessageEditedEvent = {
 }
 
 type ChatMessageEvent =
-  ChatMessage | ChatMessageDeletedEvent | ChatMessageEditedEvent
+  | ChatMessage
+  | ChatMessageDeletedEvent
+  | ChatMessageEditedEvent
+  | { type: 'typing'; display_name: string }
 
 function isMessageDeletedEvent(
   event: ChatMessageEvent,
@@ -50,6 +49,27 @@ function isMessageEditedEvent(
   return 'type' in event && event.type === 'message_edited'
 }
 
+function isTypingEvent(
+  event: ChatMessageEvent,
+): event is { type: 'typing'; display_name: string } {
+  return 'type' in event && event.type === 'typing'
+}
+
+function formatMessageTime(date: string) {
+  return new Intl.DateTimeFormat('fr-BE', {
+    hour: '2-digit',
+    minute: '2-digit',
+  }).format(new Date(date))
+}
+
+function formatMessageDay(date: string) {
+  return new Intl.DateTimeFormat('fr-BE', {
+    weekday: 'long',
+    day: 'numeric',
+    month: 'long',
+  }).format(new Date(date))
+}
+
 type MessageHistoryItem = {
   id: number
   content: string
@@ -60,7 +80,8 @@ type MessageHistoryItem = {
   created_at: string
   edited_at: string | null
   is_mine: boolean
-  attachments?: MessageAttachment[]
+  reactions: Record<string, number>
+  is_pinned: boolean
 }
 
 type ConversationDetails = {
@@ -106,6 +127,66 @@ function ChatPage() {
   const [editingMessageId, setEditingMessageId] = useState<number | null>(null)
   const [editingContent, setEditingContent] = useState('')
   const [savingMessageId, setSavingMessageId] = useState<number | null>(null)
+  const [search, setSearch] = useState('')
+  const [typingUser, setTypingUser] = useState('')
+  const typingTimerRef = useRef<number | null>(null)
+
+  function notifyTyping() {
+    // Cet événement n'enregistre rien : il prévient seulement les autres membres.
+    if (socketRef.current?.readyState === WebSocket.OPEN) {
+      socketRef.current.send(JSON.stringify({ type: 'typing' }))
+    }
+  }
+
+  async function toggleReaction(messageId: number, emoji: string) {
+    const token = await getToken()
+    if (!token) return
+    const response = await fetch(
+      `${backendUrl}/api/messages/${messageId}/react/`,
+      {
+        method: 'POST',
+        headers: {
+          Authorization: `******`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ emoji }),
+      },
+    )
+    if (!response.ok) return
+    const result = (await response.json()) as { emoji: string; active: boolean }
+    setMessages((current) =>
+      current.map((item) => {
+        if (item.message_id !== messageId) return item
+        const reactions = { ...(item.reactions ?? {}) }
+        reactions[result.emoji] = Math.max(
+          0,
+          (reactions[result.emoji] ?? 0) + (result.active ? 1 : -1),
+        )
+        return { ...item, reactions }
+      }),
+    )
+  }
+
+  async function togglePin(messageId: number) {
+    const token = await getToken()
+    if (!token) return
+    const response = await fetch(
+      `${backendUrl}/api/messages/${messageId}/pin/`,
+      {
+        method: 'POST',
+        headers: { Authorization: `******` },
+      },
+    )
+    if (!response.ok) return
+    const result = (await response.json()) as { is_pinned: boolean }
+    setMessages((current) =>
+      current.map((item) =>
+        item.message_id === messageId
+          ? { ...item, is_pinned: result.is_pinned }
+          : item,
+      ),
+    )
+  }
 
   useEffect(() => {
     if (!conversationId || !isLoaded || !isSignedIn) return
@@ -114,24 +195,33 @@ function ChatPage() {
     let isCancelled = false
 
     async function connect() {
+      debugLog('Chat page: requesting Clerk token')
       const token = await getToken()
       if (!token || isCancelled) {
+        debugLog('Chat page: Clerk token unavailable')
         setStatus('Connexion Clerk nécessaire')
         return
       }
 
       try {
+        debugLog('Chat page: loading conversation and message history', {
+          conversationId: currentConversationId,
+        })
         const headers = { Authorization: `Bearer ${token}` }
         const [conversationResponse, historyResponse] = await Promise.all([
           fetch(`${backendUrl}/api/conversations/${currentConversationId}/`, {
             headers,
           }),
           fetch(
-            `${backendUrl}/api/messages/?conversation=${currentConversationId}`,
+            `${backendUrl}/api/messages/?conversation=${currentConversationId}${search ? `&search=${encodeURIComponent(search)}` : ''}`,
             { headers },
           ),
         ])
         if (!conversationResponse.ok || !historyResponse.ok) {
+          debugLog('Chat page: API returned an error', {
+            conversationStatus: conversationResponse.status,
+            historyStatus: historyResponse.status,
+          })
           throw new Error('Impossible de charger la conversation')
         }
         if (isCancelled) return
@@ -149,10 +239,13 @@ function ChatPage() {
             created_at: item.created_at,
             edited_at: item.edited_at,
             is_mine: item.is_mine,
-            attachments: item.attachments ?? [],
+            reactions: item.reactions,
+            is_pinned: item.is_pinned,
           })),
         )
-      } catch {
+        debugLog('Chat page: conversation and history loaded')
+      } catch (error) {
+        debugError('Chat page: loading failed', error)
         setStatus('Impossible de charger la conversation')
         return
       }
@@ -187,11 +280,28 @@ function ChatPage() {
         'clerk',
         token,
       ])
+      debugLog('Chat WebSocket: opening', {
+        conversationId: currentConversationId,
+      })
       socketRef.current = socket
 
-      socket.onopen = () => setStatus('Connecté')
+      socket.onopen = () => {
+        debugLog('Chat WebSocket: connected')
+        setStatus('Connecté')
+      }
       socket.onmessage = (event) => {
+        debugLog('Chat WebSocket: message received')
         const incomingMessage = JSON.parse(event.data) as ChatMessageEvent
+        if (isTypingEvent(incomingMessage)) {
+          setTypingUser(incomingMessage.display_name)
+          if (typingTimerRef.current)
+            window.clearTimeout(typingTimerRef.current)
+          typingTimerRef.current = window.setTimeout(
+            () => setTypingUser(''),
+            1500,
+          )
+          return
+        }
         if (isMessageDeletedEvent(incomingMessage)) {
           setMessages((currentMessages) =>
             currentMessages.filter(
@@ -227,8 +337,17 @@ function ChatPage() {
           })
         }
       }
-      socket.onerror = () => setStatus('Erreur de connexion')
-      socket.onclose = () => setStatus('Déconnecté')
+      socket.onerror = (error) => {
+        debugError('Chat WebSocket: error', error)
+        setStatus('Erreur de connexion')
+      }
+      socket.onclose = (event) => {
+        debugLog('Chat WebSocket: closed', {
+          code: event.code,
+          reason: event.reason,
+        })
+        setStatus('Déconnecté')
+      }
     }
 
     void connect()
@@ -238,7 +357,7 @@ function ChatPage() {
       socketRef.current?.close()
       socketRef.current = null
     }
-  }, [conversationId, getToken, isLoaded, isSignedIn])
+  }, [conversationId, getToken, isLoaded, isSignedIn, search])
 
   async function sendMessage(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
@@ -283,6 +402,7 @@ function ChatPage() {
 
     if (socketRef.current?.readyState !== WebSocket.OPEN) return
 
+    debugLog('Chat: sending message')
     socketRef.current.send(JSON.stringify({ content }))
     setMessage('')
   }
@@ -405,10 +525,21 @@ function ChatPage() {
   return (
     <main className="chat-page">
       <header className="chat-header">
-        <Link to="/conversation">Retour aux conversations</Link>
-        <span>{status}</span>
+        <Link className="back-link" to="/conversation">
+          ← Conversations
+        </Link>
+        <div className="chat-header-status">
+          <span
+            className={`status-dot status-${status === 'Connecté' ? 'online' : 'offline'}`}
+          />
+          {status}
+        </div>
+        <ThemeToggle />
         <Show when="signed-in">
-          <UserButton />
+          <div className="profile-menu">
+            <span className="profile-label">Mon profil</span>
+            <UserButton />
+          </div>
         </Show>
       </header>
       <div className="chat-content">
@@ -424,126 +555,161 @@ function ChatPage() {
             </p>
           )}
           <div className="chat-messages">
+            <div className="chat-tools">
+              {/* La recherche recharge uniquement les messages qui correspondent. */}
+              <input
+                aria-label="Rechercher dans les messages"
+                placeholder="Rechercher dans les messages..."
+                value={search}
+                onChange={(event) => setSearch(event.target.value)}
+              />
+            </div>
             {messages.map((chatMessage, index) => (
-              <article
-                className={`chat-message${chatMessage.is_mine ? ' chat-message-own' : ''}`}
-                key={`${chatMessage.message_id}-${index}`}
-              >
-                <strong>{chatMessage.sender_display_name}</strong>
-                {editingMessageId === chatMessage.message_id ? (
-                  <form
-                    className="chat-edit-message"
-                    onSubmit={(event) => {
-                      event.preventDefault()
-                      void saveEditedMessage(chatMessage.message_id)
-                    }}
-                  >
-                    <textarea
-                      aria-label="Modifier le message"
-                      value={editingContent}
-                      onChange={(event) =>
-                        setEditingContent(event.target.value)
-                      }
-                      rows={3}
-                      autoFocus
-                    />
-                    <div>
-                      <button type="submit" disabled={savingMessageId !== null}>
-                        {savingMessageId === chatMessage.message_id
-                          ? 'Enregistrement...'
-                          : 'Enregistrer'}
-                      </button>
-                      <button
-                        type="button"
-                        disabled={savingMessageId !== null}
-                        onClick={() => {
-                          setEditingMessageId(null)
-                          setEditingContent('')
-                        }}
-                      >
-                        Annuler
-                      </button>
-                    </div>
-                  </form>
-                ) : (
-                  <>
-                    {chatMessage.content && <p>{chatMessage.content}</p>}
-                    {!!chatMessage.attachments?.length && (
-                      <ul className="chat-attachments">
-                        {chatMessage.attachments.map((attachment) => (
-                          <li key={attachment.id}>
-                            <button
-                              type="button"
-                              disabled={downloadingAttachmentId === attachment.id}
-                              onClick={() => void downloadAttachment(attachment)}
-                            >
-                              {downloadingAttachmentId === attachment.id
-                                ? 'Téléchargement...'
-                                : `${attachment.filename} (${formatFileSize(attachment.size)})`}
-                            </button>
-                          </li>
-                        ))}
-                      </ul>
-                    )}
-                    {chatMessage.edited_at && (
-                      <small className="chat-message-edited">(modifié)</small>
-                    )}
-                  </>
+              <div key={`${chatMessage.message_id}-${index}`}>
+                {(index === 0 ||
+                  new Date(messages[index - 1].created_at).toDateString() !==
+                    new Date(chatMessage.created_at).toDateString()) && (
+                  <div className="chat-day-divider">
+                    <span>{formatMessageDay(chatMessage.created_at)}</span>
+                  </div>
                 )}
-                {chatMessage.is_mine &&
-                  editingMessageId !== chatMessage.message_id && (
-                    <div className="chat-message-actions">
+                <article
+                  className={`chat-message${chatMessage.is_mine ? ' chat-message-own' : ''}`}
+                >
+                  <div className="chat-message-header">
+                    <strong>{chatMessage.sender_display_name}</strong>
+                    {chatMessage.is_pinned && (
+                      <span title="Message épinglé">📌</span>
+                    )}
+                    <time dateTime={chatMessage.created_at}>
+                      {formatMessageTime(chatMessage.created_at)}
+                    </time>
+                  </div>
+                  {editingMessageId === chatMessage.message_id ? (
+                    <form
+                      className="chat-edit-message"
+                      onSubmit={(event) => {
+                        event.preventDefault()
+                        void saveEditedMessage(chatMessage.message_id)
+                      }}
+                    >
+                      <textarea
+                        aria-label="Modifier le message"
+                        value={editingContent}
+                        onChange={(event) =>
+                          setEditingContent(event.target.value)
+                        }
+                        rows={3}
+                        autoFocus
+                      />
+                      <div>
+                        <button
+                          type="submit"
+                          disabled={savingMessageId !== null}
+                        >
+                          {savingMessageId === chatMessage.message_id
+                            ? 'Enregistrement...'
+                            : 'Enregistrer'}
+                        </button>
+                        <button
+                          type="button"
+                          disabled={savingMessageId !== null}
+                          onClick={() => {
+                            setEditingMessageId(null)
+                            setEditingContent('')
+                          }}
+                        >
+                          Annuler
+                        </button>
+                      </div>
+                    </form>
+                  ) : (
+                    <>
+                      <p>{chatMessage.content}</p>
+                      {chatMessage.edited_at && (
+                        <small className="chat-message-edited">(modifié)</small>
+                      )}
+                    </>
+                  )}
+                  <div className="chat-message-reactions">
+                    {/* Les cinq emojis proposés évitent de devoir créer un sélecteur complexe. */}
+                    {['👍', '❤️', '😂', '🎉', '👀'].map((emoji) => (
                       <button
-                        className="chat-message-menu-button"
                         type="button"
-                        aria-label="Actions sur le message"
-                        aria-expanded={
-                          openMessageMenuId === chatMessage.message_id
-                        }
-                        disabled={
-                          deletingMessageId !== null || savingMessageId !== null
-                        }
+                        key={emoji}
                         onClick={() =>
-                          setOpenMessageMenuId((openId) =>
-                            openId === chatMessage.message_id
-                              ? null
-                              : chatMessage.message_id,
-                          )
+                          void toggleReaction(chatMessage.message_id, emoji)
                         }
                       >
-                        ⋯
+                        {emoji} {chatMessage.reactions?.[emoji] ?? ''}
                       </button>
-                      {openMessageMenuId === chatMessage.message_id &&
-                        editingMessageId !== chatMessage.message_id && (
-                          <div className="chat-message-menu">
-                            <button
-                              type="button"
-                              onClick={() => {
-                                setEditingMessageId(chatMessage.message_id)
-                                setEditingContent(chatMessage.content)
-                                setOpenMessageMenuId(null)
-                                setMessageError('')
-                              }}
-                            >
-                              Modifier
-                            </button>
-                            <button
-                              type="button"
-                              disabled={deletingMessageId !== null}
-                              onClick={() =>
-                                void deleteMessage(chatMessage.message_id)
-                              }
-                            >
-                              {deletingMessageId === chatMessage.message_id
-                                ? 'Suppression...'
-                                : 'Supprimer'}
-                            </button>
-                          </div>
-                        )}
-                    </div>
-                  )}
-              </article>
+                    ))}
+                    <button
+                      type="button"
+                      onClick={() => void togglePin(chatMessage.message_id)}
+                    >
+                      {chatMessage.is_pinned ? 'Désépingler' : 'Épingler'}
+                    </button>
+                  </div>
+                  {chatMessage.is_mine &&
+                    editingMessageId !== chatMessage.message_id && (
+                      <div className="chat-message-actions">
+                        <button
+                          className="chat-message-menu-button"
+                          type="button"
+                          aria-label="Actions sur le message"
+                          aria-expanded={
+                            openMessageMenuId === chatMessage.message_id
+                          }
+                          disabled={
+                            deletingMessageId !== null ||
+                            savingMessageId !== null
+                          }
+                          onClick={() =>
+                            setOpenMessageMenuId((openId) =>
+                              openId === chatMessage.message_id
+                                ? null
+                                : chatMessage.message_id,
+                            )
+                          }
+                        >
+                          ⋯
+                        </button>
+                        {openMessageMenuId === chatMessage.message_id &&
+                          editingMessageId !== chatMessage.message_id && (
+                            <div className="chat-message-menu">
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setEditingMessageId(chatMessage.message_id)
+                                  setEditingContent(chatMessage.content)
+                                  setOpenMessageMenuId(null)
+                                  setMessageError('')
+                                }}
+                              >
+                                Modifier
+                              </button>
+                              <button
+                                type="button"
+                                disabled={deletingMessageId !== null}
+                                onClick={() =>
+                                  void deleteMessage(chatMessage.message_id)
+                                }
+                              >
+                                {deletingMessageId === chatMessage.message_id
+                                  ? 'Suppression...'
+                                  : 'Supprimer'}
+                              </button>
+                            </div>
+                          )}
+                      </div>
+                    )}
+                </article>
+              </div>
             ))}
+            {typingUser && (
+              <p className="typing-indicator">{typingUser} écrit...</p>
+            )}
           </div>
           <form className="chat-composer" onSubmit={sendMessage}>
             <label className="chat-file-picker">
@@ -559,7 +725,10 @@ function ChatPage() {
             <input
               aria-label="Message"
               value={message}
-              onChange={(event) => setMessage(event.target.value)}
+              onChange={(event) => {
+                setMessage(event.target.value)
+                notifyTyping()
+              }}
               placeholder="Écrire un message..."
             />
             <button type="submit" disabled={isUploading}>

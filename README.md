@@ -1,27 +1,24 @@
-# [Projet: Chat App]
+# Projet : Chat App
 
 [![CI](https://github.com/bjark9/projetdev1/actions/workflows/ci.yml/badge.svg)](https://github.com/bjark9/projetdev1/actions/workflows/ci.yml)
 
-[Une application de chat temps réel pour équipes (B2B) — pensez Slack, Teams ou Discord, version professionnelle.]
-
+Application de chat temps réel pour équipes (B2B), réalisée dans le cadre du
 Projet 1 du cours *Projet d'intégration de développement*.
 
-**Application en ligne :** [À COMPLÉTER : URL de production]
-
-## Sommaire
-
-- [Fonctionnalités](#fonctionnalités)
-- [Stack technique](#stack-technique)
-- [Structure du dépôt](#structure-du-dépôt)
-- [Installation en local](#installation-en-local)
-- [Variables d'environnement](#variables-denvironnement)
-- [Tests et qualité du code](#tests-et-qualité-du-code)
-- [CI/CD et déploiement](#cicd-et-déploiement)
-- [Workflow Git](#workflow-git)
-- [Équipe](#équipe)
+**Application en ligne :** l'URL publique sera ajoutée après le déploiement.
 
 ## Fonctionnalités
 
+- envoyer, recevoir et lire des messages dans une conversation ;
+- recevoir les nouveaux messages et notifications en temps réel ;
+- modifier ou supprimer ses propres messages ;
+- rechercher un mot dans les messages ;
+- réagir aux messages avec des emojis ;
+- voir quand un membre est en train d'écrire ;
+- épingler un message important ;
+- voir le nombre de messages non lus par conversation ;
+- gérer les membres d'un groupe et leurs rôles ;
+- protéger l'accès aux conversations avec Clerk.
 - [Fonctionnalité 1: envoyer et lire des messages dans une conversation]
 - Joindre plusieurs fichiers à un message; les fichiers sont stockés en base PostgreSQL (Neon en production), jusqu'à 10 Mio par fichier et 25 Mio par envoi.
 - [Fonctionnalité 2: gestion des membres et des permissions ]
@@ -31,22 +28,28 @@ Projet 1 du cours *Projet d'intégration de développement*.
 
 | Couche | Technologie |
 | --- | --- |
+| Backend | Django, Django REST Framework et Django Channels |
+| Frontend | React, TypeScript et Vite |
+| Authentification | Clerk |
+| Base de données | PostgreSQL avec Neon |
+| Temps réel | WebSockets avec Django Channels et Redis |
+| Tests | Tests Django |
+| Lint / style | Ruff, mypy, Oxlint et Prettier |
 | Backend | [Django - Python ] |
 | Frontend | [React] |
 | Base de données | PostgreSQL (Neon en production) |
 | Tests | [À COMPLÉTER : Pest / pytest / Vitest…] |
 | Lint / style | [ruff / ESLint / Prettier] |
 | CI/CD | GitHub Actions |
-| Hébergement | Versel |
+| Hébergement | Vercel pour le frontend ; backend et services à configurer |
 
 ## Structure du dépôt
 
 ```text
 .
-├── backend/     # API et logique métier
-├── frontend/    # Interface utilisateur
-├── .github/
-│   └── workflows/   # Pipelines GitHub Actions
+├── backend/              # API et logique métier Django
+├── frontend/             # Interface React
+├── .github/workflows/    # Pipeline GitHub Actions
 └── README.md
 ```
 
@@ -54,97 +57,144 @@ Projet 1 du cours *Projet d'intégration de développement*.
 
 ### Prérequis
 
-- Git
-- [À COMPLÉTER : version de Python / PHP / Node requise]
-- [À COMPLÉTER : autres outils, par exemple Composer, npm…]
+- Git ;
+- Python 3.12 ou plus récent ;
+- Node.js 22 ou plus récent ;
+- npm ;
+- une base PostgreSQL pour un déploiement complet ;
+- Redis pour le temps réel en production.
 
 ### 1. Cloner le dépôt
 
-```bash
+```powershell
 git clone https://github.com/bjark9/projetdev1.git
 cd projetdev1
 ```
 
 ### 2. Lancer le backend
 
-```bash
-cd backend
-# [À COMPLÉTER : créer l'environnement et installer les dépendances]
-# [À COMPLÉTER : copier .env.example vers .env et le remplir]
-# [À COMPLÉTER : appliquer les migrations]
-# [À COMPLÉTER : démarrer le serveur]
+Depuis le dossier `backend` :
+
+```powershell
+python -m venv .venv
+.\.venv\Scripts\Activate.ps1
+pip install -r requirements-dev.txt
+python manage.py migrate
+python manage.py runserver 8000
 ```
 
-Le backend est disponible sur [À COMPLÉTER : http://localhost:PORT].
+Le backend est disponible sur `http://localhost:8000`.
 
 ### 3. Lancer le frontend
 
-```bash
-cd frontend
-# [À COMPLÉTER : installer les dépendances]
-# [À COMPLÉTER : démarrer le serveur de développement]
+Depuis le dossier `frontend` :
+
+```powershell
+npm install
+npm run dev
 ```
 
-Le frontend est disponible sur [À COMPLÉTER : http://localhost:PORT].
+Le frontend est disponible sur `http://localhost:5173`.
 
 ## Variables d'environnement
 
-Le fichier `.env.example` liste toutes les variables nécessaires. Copiez-le en `.env` et adaptez les valeurs. Le fichier `.env` n'est **jamais** commité.
+Créez un fichier `.env` dans `backend/` et adaptez les valeurs. Ce fichier
+n'est **jamais** commité.
 
 | Variable | Rôle | Exemple |
 | --- | --- | --- |
-| [À COMPLÉTER] | [À COMPLÉTER] | [À COMPLÉTER] |
+| `DATABASE_URL` | Connexion à PostgreSQL | `postgresql://...` |
+| `DJANGO_SECRET_KEY` | Clé secrète Django | valeur secrète |
+| `DJANGO_DEBUG` | Active le mode debug local | `True` |
+| `CLERK_SECRET_KEY` | Authentification du backend avec Clerk | valeur secrète |
+| `CLERK_WEBHOOK_SIGNING_SECRET` | Vérification des webhooks Clerk | `whsec_...` |
+| `REDIS_URL` | Connexion Redis pour les WebSockets | URL Redis |
+| `DEBUG_DB_TOKEN` | Protection de la route de diagnostic | valeur secrète |
 
-Configure `REDIS_URL` in the deployed backend to point to a shared Redis instance. Django Channels uses Redis to deliver live chat messages between backend workers; without it, the in-memory layer is suitable only for local development and tests.
+En production, `REDIS_URL` doit pointer vers une instance Redis partagée.
+La couche mémoire est suffisante uniquement pour le développement local et les
+tests.
 
 ### Synchronisation des utilisateurs Clerk vers Neon
 
-Django utilise `DATABASE_URL` pour se connecter à Neon et `accounts.User` comme modèle utilisateur. Appliquez les migrations sur la base Neon après le déploiement (`python manage.py migrate`).
+Django utilise `DATABASE_URL` pour se connecter à Neon et
+`accounts.User` comme modèle utilisateur. Appliquez les migrations sur la
+base Neon après le déploiement :
 
-Dans le tableau de bord Clerk, créez un webhook vers `https://<votre-backend>/api/webhooks/clerk/` et abonnez-le aux événements `user.created`, `user.updated` et `session.created`. Ajoutez sa clé de signature (`whsec_...`) à l'environnement du backend sous `CLERK_WEBHOOK_SIGNING_SECRET`. Clerk vérifiera chaque livraison; les utilisateurs sont synchronisés de façon idempotente à la création ou à la connexion.
+```powershell
+python manage.py migrate
+```
 
-Pour tester localement, exposez le backend à Clerk via un tunnel HTTPS et configurez l'URL du webhook avec cette adresse publique.
+Dans le tableau de bord Clerk, créez un webhook vers
+`https://<votre-backend>/api/webhooks/clerk/` pour les événements
+`user.created`, `user.updated` et `session.created`. Ajoutez sa clé de
+signature à `CLERK_WEBHOOK_SIGNING_SECRET`.
 
 ## Tests et qualité du code
 
-```bash
-# Tests
-# [À COMPLÉTER : commande, par exemple php artisan test / pytest / npm test]
+Depuis le dossier `backend` :
 
-# Lint et formatage
-# [À COMPLÉTER : commande, par exemple vendor/bin/pint --test / ruff check . / npm run lint]
+```powershell
+python manage.py test accounts chat
+ruff check .
+ruff format --check .
+mypy .
 ```
 
-Les tests couvrent le cœur de l'application : [À COMPLÉTER : par exemple envoi et lecture de messages, permissions d'accès, validation des entrées].
+Depuis le dossier `frontend` :
+
+```powershell
+npm run lint
+npm run format:check
+npm run build
+```
+
+Les tests couvrent notamment l'authentification, les permissions des groupes,
+l'envoi de messages, la gestion des membres et les WebSockets.
+
+### Dépannage avec les logs
+
+Le backend affiche chaque requête HTTP, son statut, l'utilisateur reconnu et
+sa durée dans le terminal Django. Il affiche aussi les étapes d'authentification
+Clerk et de connexion WebSocket.
+
+Dans le navigateur, ouvre `F12`, puis l'onglet **Console**. Les messages qui
+commencent par `[Relay ...]` indiquent l'étape exacte qui échoue. Les tokens
+Clerk et les contenus des messages ne sont volontairement jamais affichés.
 
 ## CI/CD et déploiement
 
-Le pipeline GitHub Actions (`.github/workflows/ci.yml`) se lance sur chaque pull request et sur chaque push vers `main`.
+Le workflow GitHub Actions
+[`CI-checks.yml`](.github/workflows/CI-checks.yml) se lance sur chaque Pull
+Request et sur chaque push vers `main`.
 
-| Job | Rôle |
+| Job | Vérifications |
 | --- | --- |
-| Tests | Lance la suite de tests sur une base de test |
-| Style | Vérifie le lint et le formatage, en parallèle des tests |
+| Backend | Ruff, formatage Ruff et mypy |
+| Frontend | Installation npm, Prettier, Oxlint et build Vite |
 
-- **`main` est protégée** : pas de push direct, une pull request est obligatoire et les checks doivent être verts avant le merge.
-- **Déploiement continu** : chaque merge sur `main` déclenche le déploiement chez [À COMPLÉTER : hébergeur].
-- Aucun secret n'est stocké dans le dépôt : les valeurs sensibles sont dans *Settings → Secrets and variables → Actions*.
+`main` doit être protégée : les changements passent par une Pull Request et
+les vérifications doivent être vertes avant le merge. Le frontend est préparé
+pour un déploiement sur Vercel. L'URL publique et le déploiement du backend
+seront ajoutés lorsqu'ils seront configurés.
 
 ## Workflow Git
 
-1. Créer une branche depuis `main` : `git switch -c feature/nom-de-la-fonctionnalité`
+1. Créer une branche depuis `main` :
+   `git switch -c feature/nom-de-la-fonctionnalite`.
 2. Commiter par petites étapes avec des messages clairs.
-3. Pousser la branche : `git push -u origin feature/nom-de-la-fonctionnalité`
-4. Ouvrir une pull request vers `main`.
-5. Attendre que la CI soit verte et qu'un autre membre de l'équipe relise la PR.
+3. Pousser la branche :
+   `git push -u origin feature/nom-de-la-fonctionnalite`.
+4. Ouvrir une Pull Request vers `main`.
+5. Attendre que la CI soit verte et qu'un autre membre relise la Pull Request.
 6. Merger, puis supprimer la branche.
 
 ## Équipe
 
 | Membre | Rôle / parties réalisées |
 | --- | --- |
-| Niels ([@bjark9](https://github.com/bjark9)) | [À COMPLÉTER] |
-| Lorian | [À COMPLÉTER] |
+| Niels ([@bjark9](https://github.com/bjark9)) | Backend, WebSockets et interface |
+| Lorian | Qualité du frontend, CI et contribution au backend |
 
 ## Licence
 

@@ -14,7 +14,7 @@ User = get_user_model()
 class MessageSerializer(serializers.ModelSerializer):
     sender = UserSerializer(read_only=True)
     is_mine = serializers.SerializerMethodField()
-    attachments = serializers.SerializerMethodField()
+    reactions = serializers.SerializerMethodField()
 
     class Meta:
         model = Message
@@ -27,9 +27,20 @@ class MessageSerializer(serializers.ModelSerializer):
             "created_at",
             "edited_at",
             "read_by",
-            "attachments",
+            "is_pinned",
+            "pinned_at",
+            "reactions",
         ]
-        read_only_fields = ["id", "sender", "created_at", "edited_at", "read_by"]
+        read_only_fields = [
+            "id",
+            "sender",
+            "created_at",
+            "edited_at",
+            "read_by",
+            "is_pinned",
+            "pinned_at",
+            "reactions",
+        ]
 
     def get_attachments(self, message):
         return AttachmentSerializer(message.attachments.all(), many=True, context=self.context).data
@@ -37,6 +48,12 @@ class MessageSerializer(serializers.ModelSerializer):
     def get_is_mine(self, message):
         request = self.context.get("request")
         return request is not None and message.sender_id == request.user.pk
+
+    def get_reactions(self, message):
+        counts: dict[str, int] = {}
+        for reaction in message.reactions.all():
+            counts[reaction.emoji] = counts.get(reaction.emoji, 0) + 1
+        return counts
 
     def validate_conversation(self, conversation):
         # Cette validation protège aussi l'API HTTP, en plus du WebSocket.
@@ -84,11 +101,7 @@ class GroupSerializer(serializers.ModelSerializer):
         if request is None or not request.user.is_authenticated:
             return None
         return next(
-            (
-                membership.role
-                for membership in group.memberships.all()
-                if membership.user_id == request.user.pk
-            ),
+            (membership.role for membership in group.memberships.all() if membership.user_id == request.user.pk),
             None,
         )
 

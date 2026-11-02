@@ -2,6 +2,8 @@ import { Show, UserButton, useAuth } from '@clerk/react'
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import './App.css'
+import ThemeToggle from './ThemeToggle'
+import { debugError, debugLog } from './debug'
 
 type Conversation = {
   id: number
@@ -38,25 +40,33 @@ function ConversationPage() {
 
   useEffect(() => {
     if (!isLoaded || !isSignedIn) return
+    debugLog('Conversation page: Clerk is ready')
 
     async function loadConversations() {
       // Le token Clerk accompagne chaque appel API protégé.
       const token = await getToken()
       if (!token) {
+        debugLog('Conversation page: no Clerk token received')
         setError('Connexion Clerk nécessaire')
         return
       }
 
       try {
+        debugLog('Conversation page: loading conversations')
         const response = await fetch(`${backendUrl}/api/conversations/`, {
           headers: { Authorization: `Bearer ${token}` },
         })
         if (!response.ok) {
+          debugLog('Conversation page: API returned an error', {
+            status: response.status,
+          })
           throw new Error('Impossible de charger les conversations')
         }
         // Django renvoie les IDs numériques utilisés par la route WebSocket.
         setConversations((await response.json()) as Conversation[])
-      } catch {
+        debugLog('Conversation page: conversations loaded')
+      } catch (error) {
+        debugError('Conversation page: loading failed', error)
         setError('Impossible de charger les conversations')
       }
     }
@@ -73,10 +83,13 @@ function ConversationPage() {
     async function subscribeToMessages() {
       const token = await getToken()
       if (!token || isCancelled) return
+      debugLog('Notifications: opening WebSocket')
 
       const socket = new WebSocket(notificationWebsocketUrl(), ['clerk', token])
       sockets.push(socket)
+      socket.onopen = () => debugLog('Notifications: WebSocket connected')
       socket.onmessage = (event) => {
+        debugLog('Notifications: message received')
         const notification = JSON.parse(event.data) as {
           conversation_id: number
         }
@@ -88,8 +101,11 @@ function ConversationPage() {
           ),
         )
       }
-      socket.onerror = () => {
-        setError('Les notifications temps réel sont momentanément indisponibles.')
+      socket.onerror = (error) => {
+        debugError('Notifications: WebSocket error', error)
+        setError(
+          'Les notifications temps réel sont momentanément indisponibles.',
+        )
       }
     }
 
@@ -117,7 +133,11 @@ function ConversationPage() {
       setError('Connexion Clerk nécessaire')
       return
     }
-    if (!groupName.trim() || !conversationName.trim() || !parsedMemberIds.length) {
+    if (
+      !groupName.trim() ||
+      !conversationName.trim() ||
+      !parsedMemberIds.length
+    ) {
       setError(
         'Remplis le nom du groupe, le nom de la conversation et au moins un ID membre',
       )
@@ -125,15 +145,20 @@ function ConversationPage() {
     }
     if (
       memberIdValues.some((memberId) => !/^\d+$/.test(memberId)) ||
-      parsedMemberIds.some((memberId) => !Number.isSafeInteger(memberId) || memberId < 1)
+      parsedMemberIds.some(
+        (memberId) => !Number.isSafeInteger(memberId) || memberId < 1,
+      )
     ) {
-      setError('Les IDs des membres doivent être des nombres entiers positifs, séparés par des virgules')
+      setError(
+        'Les IDs des membres doivent être des nombres entiers positifs, séparés par des virgules',
+      )
       return
     }
 
     setIsCreating(true)
     setError('')
     try {
+      debugLog('Conversation creation: creating group')
       // Le backend ajoute automatiquement l'utilisateur connecté au groupe.
       const groupResponse = await fetch(`${backendUrl}/api/groups/`, {
         method: 'POST',
@@ -149,10 +174,13 @@ function ConversationPage() {
       if (!groupResponse.ok) {
         const details = await groupResponse.text()
         console.error('POST /api/groups/', groupResponse.status, details)
-        throw new Error(`Impossible de créer le groupe (${groupResponse.status})`)
+        throw new Error(
+          `Impossible de créer le groupe (${groupResponse.status})`,
+        )
       }
 
       const group = (await groupResponse.json()) as { id: number }
+      debugLog('Conversation creation: group created', { groupId: group.id })
       // La conversation utilise l'ID du groupe créé juste avant.
       const conversationResponse = await fetch(
         `${backendUrl}/api/conversations/`,
@@ -173,12 +201,16 @@ function ConversationPage() {
       }
 
       const conversation = (await conversationResponse.json()) as Conversation
+      debugLog('Conversation creation: conversation created', {
+        conversationId: conversation.id,
+      })
       // On met à jour l'écran avec la réponse du serveur.
       setConversations((current) => [conversation, ...current])
       setGroupName('')
       setConversationName('')
       setMemberIds('')
     } catch (creationError) {
+      debugError('Conversation creation: failed', creationError)
       setError(
         creationError instanceof Error
           ? creationError.message
@@ -201,8 +233,12 @@ function ConversationPage() {
         <div className="nav-links">
           <a href="/">Home</a>
         </div>
+        <ThemeToggle />
         <Show when="signed-in">
-          <UserButton />
+          <div className="profile-menu">
+            <span className="profile-label">Mon profil</span>
+            <UserButton />
+          </div>
         </Show>
       </nav>
 
@@ -274,6 +310,12 @@ function ConversationPage() {
                 </div>
                 <div className="conversation-row-meta">
                   <span>{conversation.group.members.length} people</span>
+                  {conversation.unread_count > 0 && (
+                    <strong className="conversation-unread-label">
+                      {conversation.unread_count} non lu
+                      {conversation.unread_count > 1 ? 's' : ''}
+                    </strong>
+                  )}
                   <span className="meta-divider" />
                   <span className="meta-muted">
                     {new Date(conversation.updated_at).toLocaleString()}

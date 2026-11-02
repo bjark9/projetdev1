@@ -165,7 +165,9 @@ function MembershipPanel({
       )}
       {(currentRole === 'owner' || currentRole === 'admin') && (
         <form className="chat-add-member" onSubmit={addMember}>
-          <label htmlFor="new-member-id">Ajouter un membre (ID utilisateur)</label>
+          <label htmlFor="new-member-id">
+            Ajouter un membre (ID utilisateur)
+          </label>
           <div>
             <input
               id="new-member-id"

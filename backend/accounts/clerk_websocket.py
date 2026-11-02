@@ -1,3 +1,4 @@
+import logging  # for debugging -> delete after maybe?
 import os
 from collections.abc import Awaitable, Callable
 from typing import Any
@@ -8,7 +9,6 @@ from django.contrib.auth.models import AnonymousUser
 
 from .models import User
 
-import logging # for debugging -> delete after maybe?
 logger = logging.getLogger(__name__)
 
 Scope = dict[str, Any]
@@ -29,9 +29,10 @@ class ClerkWebSocketMiddleware:
         # Sans sous-protocole Clerk, on conserve le mode local/session des tests.
         token = self._get_token(scope)
         if not token:
-            logger.warning("WS Clerk: pas de sous-protocole ['clerk', <token>]") # Token absent
+            logger.warning("WS Clerk: pas de sous-protocole ['clerk', <token>]")  # Token absent
             return await self.app(scope, receive, send)
 
+        logger.info("WS Clerk: token received path=%s", scope.get("path"))
         user = await self._get_user(token)
 
         authenticated_scope = dict(scope)
@@ -57,14 +58,20 @@ class ClerkWebSocketMiddleware:
                 token,
                 VerifyTokenOptions(
                     secret_key=os.environ.get("CLERK_SECRET_KEY"),
-                    authorized_parties=["http://localhost:5173", "https://projetdev1-dusky.vercel.app",],
+                    authorized_parties=[
+                        "http://localhost:5173",
+                        "https://projetdev1-dusky.vercel.app",
+                    ],
                 ),
             )
         except TokenVerificationError as exc:
             logger.warning(
-            "WS Clerk: token refusé: %r | reason=%s | secret_set=%s | secret_prefix=%s",
-            exc, getattr(exc, "reason", None), bool(secret), (secret or "")[:7],
-        )
+                "WS Clerk: token refusé: %r | reason=%s | secret_set=%s | secret_prefix=%s",
+                exc,
+                getattr(exc, "reason", None),
+                bool(secret),
+                (secret or "")[:7],
+            )
             return AnonymousUser()
 
         clerk_id = payload.get("sub")

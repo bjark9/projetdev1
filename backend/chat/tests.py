@@ -88,10 +88,7 @@ class ChatConsumerTests(TransactionTestCase):
         )
 
     async def check_message_deletion_broadcast(self, conversation_id, alice, bob, message_id):
-        communicators = [
-            WebsocketCommunicator(application, f"/api/ws/chat/{conversation_id}/")
-            for _ in (alice, bob)
-        ]
+        communicators = [WebsocketCommunicator(application, f"/api/ws/chat/{conversation_id}/") for _ in (alice, bob)]
         for communicator, user in zip(communicators, (alice, bob), strict=True):
             cast(dict[str, object], communicator.scope)["user"] = user
             connected, _ = await communicator.connect()
@@ -111,10 +108,7 @@ class ChatConsumerTests(TransactionTestCase):
             await communicator.disconnect()
 
     async def check_message_edit_broadcast(self, conversation_id, alice, bob, message):
-        communicators = [
-            WebsocketCommunicator(application, f"/api/ws/chat/{conversation_id}/")
-            for _ in (alice, bob)
-        ]
+        communicators = [WebsocketCommunicator(application, f"/api/ws/chat/{conversation_id}/") for _ in (alice, bob)]
         for communicator, user in zip(communicators, (alice, bob), strict=True):
             cast(dict[str, object], communicator.scope)["user"] = user
             connected, _ = await communicator.connect()
@@ -627,18 +621,12 @@ class GroupApiTests(TestCase):
         )
         self.assertEqual(add_response.status_code, 201)
 
-        remove_member_response = self.api_client.delete(
-            f"/api/groups/{group.id}/members/{charlie.id}/"
-        )
+        remove_member_response = self.api_client.delete(f"/api/groups/{group.id}/members/{charlie.id}/")
         self.assertEqual(remove_member_response.status_code, 204)
 
-        remove_admin_response = self.api_client.delete(
-            f"/api/groups/{group.id}/members/{dave.id}/"
-        )
+        remove_admin_response = self.api_client.delete(f"/api/groups/{group.id}/members/{dave.id}/")
         self.assertEqual(remove_admin_response.status_code, 403)
-        remove_owner_response = self.api_client.delete(
-            f"/api/groups/{group.id}/members/{self.alice.id}/"
-        )
+        remove_owner_response = self.api_client.delete(f"/api/groups/{group.id}/members/{self.alice.id}/")
         self.assertEqual(remove_owner_response.status_code, 400)
         self.assertTrue(Membership.objects.filter(group=group, user=self.alice).exists())
         self.assertTrue(Membership.objects.filter(group=group, user=dave).exists())
