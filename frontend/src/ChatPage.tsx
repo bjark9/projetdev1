@@ -594,7 +594,10 @@ function ChatPage() {
               />
             </div>
             {messages.map((chatMessage, index) => (
-              <div key={`${chatMessage.message_id}-${index}`}>
+              <div
+                className="chat-message-row"
+                key={`${chatMessage.message_id}-${index}`}
+              >
                 {(index === 0 ||
                   new Date(messages[index - 1].created_at).toDateString() !==
                     new Date(chatMessage.created_at).toDateString()) && (

@@ -204,11 +204,17 @@
   font-size: 14px;
 }
 
-.chat-message + .chat-message {
+.chat-message-row + .chat-message-row {
   margin-top: 18px;
 }
 
+.chat-message-row {
+  display: flex;
+  flex-direction: column;
+}
+
 .chat-message {
+  align-self: flex-start;
   width: fit-content;
   max-width: 80%;
   padding: 12px 16px;
