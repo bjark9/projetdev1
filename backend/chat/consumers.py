@@ -90,6 +90,7 @@ class ChatConsumer(AsyncWebsocketConsumer):
                     "sender_display_name": event["sender_display_name"],
                     "is_mine": event["sender_id"] == self.user.id,
                     "created_at": event["created_at"],
+                    "attachments": event["attachments"],
                 }
             )
         )
