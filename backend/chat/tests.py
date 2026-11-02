@@ -303,6 +303,30 @@ class GroupApiTests(TestCase):
         self.assertEqual(response.status_code, 201)
         self.assertEqual(Message.objects.get().content, "Bonjour")
 
+    def test_member_can_toggle_message_reaction(self):
+        group = Group.objects.create(name="Equipe de projet")
+        Membership.objects.create(group=group, user=self.alice)
+        Membership.objects.create(group=group, user=self.bob)
+        conversation = Conversation.objects.create(group=group, name="General")
+        message = Message.objects.create(conversation=conversation, sender=self.alice, content="Bonjour")
+        self.api_client.force_authenticate(user=self.bob)
+
+        reaction_url = f"/api/messages/{message.id}/react/"
+        first_response = self.api_client.post(reaction_url, {"emoji": "👍"}, format="json")
+        active_history = self.api_client.get(f"/api/messages/?conversation={conversation.id}")
+        second_response = self.api_client.post(reaction_url, {"emoji": "👍"}, format="json")
+        inactive_history = self.api_client.get(f"/api/messages/?conversation={conversation.id}")
+
+        self.assertEqual(first_response.status_code, 200)
+        self.assertEqual(first_response.data, {"emoji": "👍", "active": True})
+        self.assertEqual(active_history.status_code, 200)
+        self.assertEqual(active_history.data[0]["reactions"], {"👍": 1})
+        self.assertEqual(second_response.status_code, 200)
+        self.assertEqual(second_response.data, {"emoji": "👍", "active": False})
+        self.assertEqual(inactive_history.status_code, 200)
+        self.assertEqual(inactive_history.data[0]["reactions"], {})
+        self.assertFalse(message.reactions.filter(user=self.bob, emoji="👍").exists())
+
     def test_member_can_upload_and_download_message_attachment(self):
         group = Group.objects.create(name="Equipe de projet")
         Membership.objects.create(group=group, user=self.alice)

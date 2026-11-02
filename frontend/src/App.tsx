@@ -97,7 +97,7 @@ function App() {
               <span className="avatar avatar-four">+</span>
             </div>
             <span>
-              Join 100000000000000000000000000000000000000000000000+ thoughtful
+              Join 1000+ thoughtful
               teams
             </span>
           </div>

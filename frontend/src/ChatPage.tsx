@@ -149,32 +149,50 @@ function ChatPage() {
   }
 
   async function toggleReaction(messageId: number, emoji: string) {
-    const token = await getToken()
-    if (!token) return
-    const response = await fetch(
-      `${backendUrl}/api/messages/${messageId}/react/`,
-      {
-        method: 'POST',
-        headers: {
-          Authorization: `******`,
-          'Content-Type': 'application/json',
+    setMessageError('')
+    try {
+      const token = await getToken()
+      if (!token) throw new Error('Connexion Clerk nécessaire')
+
+      const response = await fetch(
+        `${backendUrl}/api/messages/${messageId}/react/`,
+        {
+          method: 'POST',
+          headers: {
+            Authorization: `******`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ emoji }),
         },
-        body: JSON.stringify({ emoji }),
-      },
-    )
-    if (!response.ok) return
-    const result = (await response.json()) as { emoji: string; active: boolean }
-    setMessages((current) =>
-      current.map((item) => {
-        if (item.message_id !== messageId) return item
-        const reactions = { ...(item.reactions ?? {}) }
-        reactions[result.emoji] = Math.max(
-          0,
-          (reactions[result.emoji] ?? 0) + (result.active ? 1 : -1),
+      )
+      if (!response.ok) {
+        throw new Error(
+          `Impossible de mettre à jour la réaction (HTTP ${response.status}).`,
         )
-        return { ...item, reactions }
-      }),
-    )
+      }
+
+      const result = (await response.json()) as {
+        emoji: string
+        active: boolean
+      }
+      setMessages((current) =>
+        current.map((item) => {
+          if (item.message_id !== messageId) return item
+          const reactions = { ...(item.reactions ?? {}) }
+          reactions[result.emoji] = Math.max(
+            0,
+            (reactions[result.emoji] ?? 0) + (result.active ? 1 : -1),
+          )
+          return { ...item, reactions }
+        }),
+      )
+    } catch (error) {
+      setMessageError(
+        error instanceof Error
+          ? error.message
+          : 'Impossible de mettre à jour la réaction.',
+      )
+    }
   }
 
   async function togglePin(messageId: number) {
