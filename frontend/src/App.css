@@ -591,6 +591,98 @@ h2 em {
 .feature-grid article:last-child {
   border: 0;
 }
+.pricing-section {
+  background: var(--surface-soft);
+  margin: 0 auto 145px;
+  padding: 110px max(40px, calc((100% - 1160px) / 2));
+}
+.pricing-intro {
+  margin-bottom: 45px;
+}
+.pricing-intro-copy {
+  color: var(--muted);
+  font-size: 15px;
+  line-height: 1.6;
+  max-width: 260px;
+}
+.pricing-grid {
+  display: grid;
+  gap: 20px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+.pricing-card {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  min-height: 400px;
+  padding: 30px;
+  position: relative;
+}
+.pricing-card-featured {
+  border: 2px solid var(--coral);
+}
+.pricing-badge {
+  background: var(--coral);
+  color: white;
+  font: 10px var(--mono);
+  padding: 7px 10px;
+  position: absolute;
+  right: 20px;
+  text-transform: uppercase;
+  top: 20px;
+}
+.pricing-name {
+  color: var(--coral);
+  font-family: var(--mono);
+  font-size: 12px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+.pricing-description {
+  color: var(--muted);
+  font-size: 14px;
+  line-height: 1.5;
+  max-width: 280px;
+}
+.pricing-price {
+  font-family: var(--serif);
+  font-size: 42px;
+  letter-spacing: -0.05em;
+  margin: 30px 0 25px;
+}
+.pricing-price small {
+  color: var(--muted);
+  font-family: var(--sans);
+  font-size: 12px;
+  letter-spacing: 0;
+}
+.pricing-card ul {
+  border-top: 1px solid var(--line);
+  list-style: none;
+  margin: 0 0 30px;
+  padding: 18px 0 0;
+}
+.pricing-card li {
+  color: var(--muted);
+  font-size: 13px;
+  margin: 10px 0;
+}
+.pricing-card li::before {
+  color: var(--coral);
+  content: '✓';
+  font-weight: 700;
+  margin-right: 9px;
+}
+.button-outline {
+  border: 1px solid var(--line);
+  color: var(--ink);
+}
+.pricing-note {
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.5;
+  margin: 22px 0 0;
+  max-width: 600px;
+}
 .feature-number {
   color: var(--coral);
   font-family: var(--mono);
@@ -721,6 +813,16 @@ footer {
   }
   .feature-section {
     padding: 110px 0 100px;
+  }
+  .pricing-section {
+    margin-bottom: 80px;
+    padding: 80px 20px;
+  }
+  .pricing-grid {
+    display: block;
+  }
+  .pricing-card + .pricing-card {
+    margin-top: 16px;
   }
   .feature-grid {
     display: block;
