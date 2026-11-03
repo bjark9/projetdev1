@@ -40,10 +40,17 @@ type ChatMessageEditedEvent = {
   edited_at: string
 }
 
+type ChatMessageReactionUpdatedEvent = {
+  type: 'message_reaction_updated'
+  message_id: number
+  reactions: Record<string, number>
+}
+
 type ChatMessageEvent =
   | ChatMessage
   | ChatMessageDeletedEvent
   | ChatMessageEditedEvent
+  | ChatMessageReactionUpdatedEvent
   | { type: 'typing'; display_name: string }
 
 function isMessageDeletedEvent(
@@ -56,6 +63,12 @@ function isMessageEditedEvent(
   event: ChatMessageEvent,
 ): event is ChatMessageEditedEvent {
   return 'type' in event && event.type === 'message_edited'
+}
+
+function isMessageReactionUpdatedEvent(
+  event: ChatMessageEvent,
+): event is ChatMessageReactionUpdatedEvent {
+  return 'type' in event && event.type === 'message_reaction_updated'
 }
 
 function isTypingEvent(
@@ -183,16 +196,12 @@ function ChatPage() {
       const result = (await response.json()) as {
         emoji: string
         active: boolean
+        reactions: Record<string, number>
       }
       setMessages((current) =>
         current.map((item) => {
           if (item.message_id !== messageId) return item
-          const reactions = { ...(item.reactions ?? {}) }
-          reactions[result.emoji] = Math.max(
-            0,
-            (reactions[result.emoji] ?? 0) + (result.active ? 1 : -1),
-          )
-          return { ...item, reactions }
+          return { ...item, reactions: result.reactions }
         }),
       )
     } catch (error) {
@@ -358,6 +367,16 @@ function ChatPage() {
                     content: incomingMessage.content,
                     edited_at: incomingMessage.edited_at,
                   }
+                : currentMessage,
+            ),
+          )
+          return
+        }
+        if (isMessageReactionUpdatedEvent(incomingMessage)) {
+          setMessages((currentMessages) =>
+            currentMessages.map((currentMessage) =>
+              currentMessage.message_id === incomingMessage.message_id
+                ? { ...currentMessage, reactions: incomingMessage.reactions }
                 : currentMessage,
             ),
           )

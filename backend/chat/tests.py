@@ -10,7 +10,11 @@ from rest_framework.test import APIClient
 
 from mysite.asgi import application
 
-from .events import broadcast_message_deleted, broadcast_message_edited
+from .events import (
+    broadcast_message_deleted,
+    broadcast_message_edited,
+    broadcast_message_reaction,
+)
 from .models import Conversation, Group, Membership, Message, MessageAttachment
 
 User = get_user_model()
@@ -87,6 +91,26 @@ class ChatConsumerTests(TransactionTestCase):
             message,
         )
 
+    def test_message_reaction_is_broadcast_to_all_connected_members(self):
+        alice = User.objects.create_user(username="alice")
+        bob = User.objects.create_user(username="bob")
+        group = Group.objects.create(name="general")
+        Membership.objects.create(group=group, user=alice)
+        Membership.objects.create(group=group, user=bob)
+        conversation = Conversation.objects.create(group=group, name="general")
+        message = Message.objects.create(
+            conversation=conversation,
+            sender=alice,
+            content="Bonjour",
+        )
+
+        async_to_sync(self.check_message_reaction_broadcast)(
+            conversation.id,
+            alice,
+            bob,
+            message.id,
+        )
+
     async def check_message_deletion_broadcast(self, conversation_id, alice, bob, message_id):
         communicators = [WebsocketCommunicator(application, f"/api/ws/chat/{conversation_id}/") for _ in (alice, bob)]
         for communicator, user in zip(communicators, (alice, bob), strict=True):
@@ -121,6 +145,32 @@ class ChatConsumerTests(TransactionTestCase):
             "message_id": message.id,
             "content": "Texte modifié",
             "edited_at": message.edited_at.isoformat(),
+        }
+        self.assertEqual(events, [expected_event, expected_event])
+
+        for communicator in communicators:
+            await communicator.disconnect()
+
+    async def check_message_reaction_broadcast(
+        self,
+        conversation_id,
+        alice,
+        bob,
+        message_id,
+    ):
+        communicators = [WebsocketCommunicator(application, f"/api/ws/chat/{conversation_id}/") for _ in (alice, bob)]
+        for communicator, user in zip(communicators, (alice, bob), strict=True):
+            cast(dict[str, object], communicator.scope)["user"] = user
+            connected, _ = await communicator.connect()
+            self.assertTrue(connected)
+
+        reactions = {"👍": 2, "😂": 1}
+        await broadcast_message_reaction(message_id, conversation_id, reactions)
+        events = [await communicator.receive_json_from() for communicator in communicators]
+        expected_event = {
+            "type": "message_reaction_updated",
+            "message_id": message_id,
+            "reactions": reactions,
         }
         self.assertEqual(events, [expected_event, expected_event])
 
@@ -347,11 +397,11 @@ class GroupApiTests(TestCase):
         inactive_history = self.api_client.get(f"/api/messages/?conversation={conversation.id}")
 
         self.assertEqual(first_response.status_code, 200)
-        self.assertEqual(first_response.data, {"emoji": "👍", "active": True})
+        self.assertEqual(first_response.data, {"emoji": "👍", "active": True, "reactions": {"👍": 1}})
         self.assertEqual(active_history.status_code, 200)
         self.assertEqual(active_history.data[0]["reactions"], {"👍": 1})
         self.assertEqual(second_response.status_code, 200)
-        self.assertEqual(second_response.data, {"emoji": "👍", "active": False})
+        self.assertEqual(second_response.data, {"emoji": "👍", "active": False, "reactions": {}})
         self.assertEqual(inactive_history.status_code, 200)
         self.assertEqual(inactive_history.data[0]["reactions"], {})
         self.assertFalse(message.reactions.filter(user=self.bob, emoji="👍").exists())

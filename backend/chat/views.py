@@ -7,6 +7,7 @@ from io import BytesIO
 from asgiref.sync import async_to_sync
 from django.contrib.auth import get_user_model
 from django.db import transaction
+from django.db.models import Count
 from django.http import FileResponse
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
@@ -16,7 +17,12 @@ from rest_framework.exceptions import PermissionDenied
 from rest_framework.parsers import FormParser, MultiPartParser
 from rest_framework.response import Response
 
-from .events import broadcast_message, broadcast_message_deleted, broadcast_message_edited
+from .events import (
+    broadcast_message,
+    broadcast_message_deleted,
+    broadcast_message_edited,
+    broadcast_message_reaction,
+)
 from .models import Conversation, Group, Membership, Message, MessageAttachment, Reaction
 from .serializers import (
     ConversationCreateSerializer,
@@ -296,7 +302,19 @@ class MessageViewSet(
         reaction, created = Reaction.objects.get_or_create(message=message, user=request.user, emoji=emoji)
         if not created:
             reaction.delete()
-        return Response({"emoji": emoji, "active": created}, status=status.HTTP_200_OK)
+        reactions = {
+            item["emoji"]: item["count"]
+            for item in message.reactions.values("emoji").annotate(count=Count("pk"))
+        }
+        async_to_sync(broadcast_message_reaction)(
+            message.id,
+            message.conversation_id,
+            reactions,
+        )
+        return Response(
+            {"emoji": emoji, "active": created, "reactions": reactions},
+            status=status.HTTP_200_OK,
+        )
 
     @action(detail=True, methods=["post"], url_path="pin")
     def pin(self, request, pk=None):

@@ -134,6 +134,17 @@ class ChatConsumer(AsyncWebsocketConsumer):
             )
         )
 
+    async def chat_message_reaction(self, event: dict[str, Any]) -> None:
+        await self.send(
+            text_data=json.dumps(
+                {
+                    "type": "message_reaction_updated",
+                    "message_id": event["message_id"],
+                    "reactions": event["reactions"],
+                }
+            )
+        )
+
     async def user_typing(self, event: dict[str, Any]) -> None:
         if event["user_id"] != self.user.id:
             await self.send(text_data=json.dumps({"type": "typing", "display_name": event["display_name"]}))

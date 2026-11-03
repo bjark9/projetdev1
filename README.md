@@ -6,7 +6,7 @@
 
 Projet 1 du cours *Projet d'intégration de développement*.
 
-**Application en ligne :** [À COMPLÉTER : URL de production]
+**Application en ligne :** https://projetdev1-dusky.vercel.app/
 
 ## Sommaire
 
