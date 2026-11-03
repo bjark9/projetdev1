@@ -118,7 +118,10 @@ n'est **jamais** commité.
 
 En production, `REDIS_URL` doit pointer vers une instance Redis partagée.
 La couche mémoire est suffisante uniquement pour le développement local et les
-tests.
+tests. Si Redis devient indisponible ou dépasse le délai de lecture, la
+connexion WebSocket concernée est fermée avec le code `1011` et un avertissement
+est écrit dans les logs ; vérifiez alors l'état de l'instance et la valeur de
+`REDIS_URL`.
 
 ### Synchronisation des utilisateurs Clerk vers Neon
 
