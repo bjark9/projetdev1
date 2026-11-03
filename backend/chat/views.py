@@ -35,6 +35,7 @@ class GroupViewSet(
     mixins.ListModelMixin,
     mixins.RetrieveModelMixin,
     mixins.CreateModelMixin,
+    mixins.DestroyModelMixin,
     viewsets.GenericViewSet,
 ):
     """List / retrieve / create the groups the current user belongs to."""
@@ -51,6 +52,21 @@ class GroupViewSet(
 
     def get_serializer_class(self):
         return GroupCreateSerializer if self.action == "create" else GroupSerializer
+
+    def destroy(self, request, *args, **kwargs):
+        group = self.get_object()
+        is_owner = group.memberships.filter(
+            user=request.user,
+            role=Membership.Role.OWNER,
+        ).exists()
+        if not is_owner:
+            return Response(
+                {"detail": "Only the group creator can delete the group."},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
+        self.perform_destroy(group)
+        return Response(status=status.HTTP_204_NO_CONTENT)
 
     @action(detail=True, methods=["post"], url_path="members")
     def add_member(self, request, pk=None):

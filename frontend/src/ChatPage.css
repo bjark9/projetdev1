@@ -127,6 +127,20 @@
   padding: 7px 10px;
 }
 
+.chat-delete-group {
+  margin-top: 12px;
+  padding: 7px 10px;
+  border: 1px solid #a52b21;
+  border-radius: 6px;
+  background: transparent;
+  color: #a52b21;
+  cursor: pointer;
+}
+
+.chat-delete-group:disabled {
+  cursor: wait;
+}
+
 .chat-members-list {
   display: grid;
   gap: 8px;

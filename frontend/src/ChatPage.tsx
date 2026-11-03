@@ -1,7 +1,7 @@
 import { Show, UserButton, useAuth } from '@clerk/react'
 import { useEffect, useRef, useState } from 'react'
 import type { FormEvent } from 'react'
-import { Link, useParams } from 'react-router-dom'
+import { Link, useNavigate, useParams } from 'react-router-dom'
 import MembershipPanel from './MembershipPanel'
 import type { ChatGroup } from './MembershipPanel'
 import './ChatPage.css'
@@ -114,9 +114,11 @@ function websocketUrl(conversationId: string) {
 
 function ChatPage() {
   const { conversationId } = useParams<{ conversationId: string }>()
+  const navigate = useNavigate()
   const { getToken, isLoaded, isSignedIn } = useAuth()
   const socketRef = useRef<WebSocket | null>(null)
   const fileInputRef = useRef<HTMLInputElement | null>(null)
+  const messagesContainerRef = useRef<HTMLDivElement | null>(null)
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const [message, setMessage] = useState('')
   const [files, setFiles] = useState<File[]>([])
@@ -140,6 +142,13 @@ function ChatPage() {
   const [search, setSearch] = useState('')
   const [typingUser, setTypingUser] = useState('')
   const typingTimerRef = useRef<number | null>(null)
+
+  useEffect(() => {
+    const messagesContainer = messagesContainerRef.current
+    if (messagesContainer) {
+      messagesContainer.scrollTop = messagesContainer.scrollHeight
+    }
+  }, [messages])
 
   function notifyTyping() {
     // Cet événement n'enregistre rien : il prévient seulement les autres membres.
@@ -583,7 +592,7 @@ function ChatPage() {
               {messageError}
             </p>
           )}
-          <div className="chat-messages">
+          <div className="chat-messages" ref={messagesContainerRef}>
             <div className="chat-tools">
               {/* La recherche recharge uniquement les messages qui correspondent. */}
               <input
@@ -789,6 +798,7 @@ function ChatPage() {
           <MembershipPanel
             group={conversation.group}
             conversationId={conversation.id}
+            onGroupDeleted={() => navigate('/conversation', { replace: true })}
             onGroupUpdated={(group) =>
               setConversation((current) =>
                 current ? { ...current, group } : current,

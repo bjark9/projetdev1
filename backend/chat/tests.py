@@ -274,6 +274,35 @@ class GroupApiTests(TestCase):
 
         self.assertEqual(response.status_code, 404)
 
+    def test_group_owner_can_delete_group_and_its_conversations(self):
+        group = Group.objects.create(name="Equipe de projet")
+        Membership.objects.create(group=group, user=self.alice, role=Membership.Role.OWNER)
+        conversation = Conversation.objects.create(group=group, name="General")
+        message = Message.objects.create(
+            conversation=conversation,
+            sender=self.alice,
+            content="À supprimer",
+        )
+
+        self.api_client.force_authenticate(user=self.alice)
+        response = self.api_client.delete(f"/api/groups/{group.id}/")
+
+        self.assertEqual(response.status_code, 204)
+        self.assertFalse(Group.objects.filter(pk=group.id).exists())
+        self.assertFalse(Conversation.objects.filter(pk=conversation.id).exists())
+        self.assertFalse(Message.objects.filter(pk=message.id).exists())
+
+    def test_group_member_cannot_delete_group(self):
+        group = Group.objects.create(name="Equipe de projet")
+        Membership.objects.create(group=group, user=self.alice, role=Membership.Role.OWNER)
+        Membership.objects.create(group=group, user=self.bob, role=Membership.Role.MEMBER)
+
+        self.api_client.force_authenticate(user=self.bob)
+        response = self.api_client.delete(f"/api/groups/{group.id}/")
+
+        self.assertEqual(response.status_code, 403)
+        self.assertTrue(Group.objects.filter(pk=group.id).exists())
+
     def test_member_can_create_conversation(self):
         group = Group.objects.create(name="Equipe de projet")
         Membership.objects.create(group=group, user=self.alice)

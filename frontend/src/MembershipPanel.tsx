@@ -23,6 +23,7 @@ type MembershipPanelProps = {
   group: ChatGroup
   conversationId: number
   onGroupUpdated: (group: ChatGroup) => void
+  onGroupDeleted: () => void
 }
 
 const backendUrl =
@@ -33,6 +34,7 @@ function MembershipPanel({
   group,
   conversationId,
   onGroupUpdated,
+  onGroupDeleted,
 }: MembershipPanelProps) {
   const { getToken } = useAuth()
   const [memberId, setMemberId] = useState('')
@@ -143,6 +145,37 @@ function MembershipPanel({
     }
   }
 
+  async function deleteGroup() {
+    if (
+      !window.confirm(
+        `Supprimer le groupe « ${group.name} » et toutes ses conversations ?`,
+      )
+    ) {
+      return
+    }
+
+    setIsManagingMembers(true)
+    setError('')
+    try {
+      const token = await getToken()
+      if (!token) throw new Error('Connexion Clerk nécessaire')
+      const response = await fetch(`${backendUrl}/api/groups/${group.id}/`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${token}` },
+      })
+      if (!response.ok) throw new Error('Impossible de supprimer le groupe.')
+      onGroupDeleted()
+    } catch (requestError) {
+      setError(
+        requestError instanceof Error
+          ? requestError.message
+          : 'Impossible de supprimer le groupe.',
+      )
+    } finally {
+      setIsManagingMembers(false)
+    }
+  }
+
   return (
     <aside className="chat-members-panel" aria-label="Membres du groupe">
       <div className="chat-members-heading">
@@ -158,6 +191,16 @@ function MembershipPanel({
           </p>
         </div>
       </div>
+      {currentRole === 'owner' && (
+        <button
+          type="button"
+          className="chat-delete-group"
+          disabled={isManagingMembers}
+          onClick={() => void deleteGroup()}
+        >
+          Supprimer le groupe
+        </button>
+      )}
       {error && (
         <p className="chat-members-error" role="alert">
           {error}
