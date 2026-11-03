@@ -48,6 +48,7 @@ function App() {
         </a>
         <div className="nav-links">
           <a href="#conversations">Conversations</a>
+          <a href="#pricing">Pricing</a>
           <a href="#ritual">Our approach</a>
           <a href="#footer">About</a>
         </div>
@@ -97,7 +98,7 @@ function App() {
               <span className="avatar avatar-four">+</span>
             </div>
             <span>
-              Join 1000+ thoughtful
+              Join 100000000000000000000000000000000000000000000000+ thoughtful
               teams
             </span>
           </div>
@@ -238,6 +239,68 @@ function App() {
           </article>
         </div>
       </section>
+      <section className="pricing-section" id="pricing">
+        <div className="section-intro pricing-intro">
+          <div>
+            <p className="eyebrow">
+              <span className="eyebrow-line" /> Simple pricing
+            </p>
+            <h2>
+              Start small.
+              <br />
+              <em>Grow together.</em>
+            </h2>
+          </div>
+          <p className="pricing-intro-copy">
+            Des formules simples pour une équipe qui veut discuter sans
+            surprise.
+          </p>
+        </div>
+        <div className="pricing-grid">
+          <article className="pricing-card">
+            <p className="pricing-name">Free</p>
+            <p className="pricing-description">
+              Pour découvrir Relay avec une petite équipe.
+            </p>
+            <p className="pricing-price">
+              0€ <small>/ mois</small>
+            </p>
+            <ul>
+              <li>3 membres par groupe</li>
+              <li>1 000 messages par mois</li>
+              <li>30 jours de conservation</li>
+              <li>Messages en temps réel</li>
+            </ul>
+            <a className="button button-outline" href="#demo">
+              Commencer gratuitement <span aria-hidden="true">↗</span>
+            </a>
+          </article>
+          <article className="pricing-card pricing-card-featured">
+            <span className="pricing-badge">Le plus populaire</span>
+            <p className="pricing-name">Pro</p>
+            <p className="pricing-description">
+              Pour les équipes qui travaillent ensemble chaque jour.
+            </p>
+            <p className="pricing-price">
+              8€ <small>/ utilisateur / mois</small>
+            </p>
+            <ul>
+              <li>50 membres par groupe</li>
+              <li>Messages illimités</li>
+              <li>Conservation de 12 mois</li>
+              <li>Réactions et recherche dans les messages</li>
+            </ul>
+            <a className="button button-primary" href="#demo">
+              Essayer Pro <span aria-hidden="true">↗</span>
+            </a>
+          </article>
+        </div>
+        <p className="pricing-note">
+          Les quotas sont proposés pour le prototype : ils illustrent la
+          différence entre une formule découverte et une formule équipe. Ils ne
+          bloquent pas encore techniquement les utilisateurs.
+        </p>
+      </section>
       <section className="ritual-section" id="ritual">
         <div className="ritual-stamp" aria-hidden="true">
           ✦<br />
@@ -275,6 +338,7 @@ function App() {
         <span>© 2026 Relay Studio</span>
         <div className="footer-links">
           <a href="#conversations">Conversations</a>
+          <a href="#pricing">Pricing</a>
           <a href="#ritual">Manifesto</a>
           <a href="#top">Contact</a>
         </div>
