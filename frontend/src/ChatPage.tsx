@@ -159,7 +159,7 @@ function ChatPage() {
         {
           method: 'POST',
           headers: {
-            Authorization: `******`,
+            Authorization: `Bearer ${token}`,
             'Content-Type': 'application/json',
           },
           body: JSON.stringify({ emoji }),
@@ -202,7 +202,7 @@ function ChatPage() {
       `${backendUrl}/api/messages/${messageId}/pin/`,
       {
         method: 'POST',
-        headers: { Authorization: `******` },
+        headers: { Authorization: `Bearer ${token}` },
       },
     )
     if (!response.ok) return
