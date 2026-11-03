@@ -15,7 +15,6 @@ Projet 1 du cours *Projet d'intégration de développement*.
 - rechercher un mot dans les messages ;
 - réagir aux messages avec des emojis ;
 - voir quand un membre est en train d'écrire ;
-- épingler un message important ;
 - voir le nombre de messages non lus par conversation ;
 - gérer les membres d'un groupe et leurs rôles ;
 - protéger l'accès aux conversations avec Clerk.

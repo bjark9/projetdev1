@@ -288,7 +288,7 @@ function App() {
               <li>50 membres par groupe</li>
               <li>Messages illimités</li>
               <li>Conservation de 12 mois</li>
-              <li>Réactions, recherche et messages épinglés</li>
+              <li>Réactions et recherche dans les messages</li>
             </ul>
             <a className="button button-primary" href="#demo">
               Essayer Pro <span aria-hidden="true">↗</span>

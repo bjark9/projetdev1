@@ -16,7 +16,6 @@ type ChatMessage = {
   edited_at?: string | null
   is_mine: boolean
   reactions?: Record<string, number>
-  is_pinned?: boolean
 }
 
 type ChatMessageDeletedEvent = {
@@ -81,7 +80,6 @@ type MessageHistoryItem = {
   edited_at: string | null
   is_mine: boolean
   reactions: Record<string, number>
-  is_pinned: boolean
 }
 
 type ConversationDetails = {
@@ -167,27 +165,6 @@ function ChatPage() {
     )
   }
 
-  async function togglePin(messageId: number) {
-    const token = await getToken()
-    if (!token) return
-    const response = await fetch(
-      `${backendUrl}/api/messages/${messageId}/pin/`,
-      {
-        method: 'POST',
-        headers: { Authorization: `******` },
-      },
-    )
-    if (!response.ok) return
-    const result = (await response.json()) as { is_pinned: boolean }
-    setMessages((current) =>
-      current.map((item) =>
-        item.message_id === messageId
-          ? { ...item, is_pinned: result.is_pinned }
-          : item,
-      ),
-    )
-  }
-
   useEffect(() => {
     if (!conversationId || !isLoaded || !isSignedIn) return
 
@@ -240,7 +217,6 @@ function ChatPage() {
             edited_at: item.edited_at,
             is_mine: item.is_mine,
             reactions: item.reactions,
-            is_pinned: item.is_pinned,
           })),
         )
         debugLog('Chat page: conversation and history loaded')
@@ -578,9 +554,6 @@ function ChatPage() {
                 >
                   <div className="chat-message-header">
                     <strong>{chatMessage.sender_display_name}</strong>
-                    {chatMessage.is_pinned && (
-                      <span title="Message épinglé">📌</span>
-                    )}
                     <time dateTime={chatMessage.created_at}>
                       {formatMessageTime(chatMessage.created_at)}
                     </time>
@@ -644,12 +617,6 @@ function ChatPage() {
                         {emoji} {chatMessage.reactions?.[emoji] ?? ''}
                       </button>
                     ))}
-                    <button
-                      type="button"
-                      onClick={() => void togglePin(chatMessage.message_id)}
-                    >
-                      {chatMessage.is_pinned ? 'Désépingler' : 'Épingler'}
-                    </button>
                   </div>
                   {chatMessage.is_mine &&
                     editingMessageId !== chatMessage.message_id && (
