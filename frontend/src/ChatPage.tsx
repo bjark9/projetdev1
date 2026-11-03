@@ -308,8 +308,9 @@ function ChatPage() {
           body: JSON.stringify({ conversation: currentConversationId }),
         })
         if (!response.ok) {
-          throw new Error('Impossible de mettre à jour les messages non lus.')
+          throw new Error()
         }
+        setReadError('')
       }
 
       try {
